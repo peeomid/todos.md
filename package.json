@@ -1,0 +1,50 @@
+{
+  "name": "todosmd",
+  "version": "0.1.0",
+  "description": "CLI tool for managing tasks in Markdown files",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
+  },
+  "bin": {
+    "tmd": "dist/cli.js"
+  },
+  "scripts": {
+    "tmd": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "pnpm lint:biome && pnpm typecheck",
+    "lint:biome": "biome check",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "tsc -w -p tsconfig.build.json"
+  },
+  "keywords": ["todo", "markdown", "cli", "task"],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "dependencies": {
+    "commander": "^14.0.2",
+    "es-toolkit": "^1.42.0",
+    "ora": "^9.0.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.8",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  }
+}

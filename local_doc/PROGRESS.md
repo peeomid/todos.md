@@ -1,0 +1,34 @@
+- Added specs for cli architecture and commands
+- Removed vault references; user specifies input files explicitly via `files` config
+- Removed `week` metadata field completely from all specs, schema, and lint rules
+- Implemented `tmd index` inherited values (area from project, energy defaults to 'normal', created defaults to today) - written to todos.json only, not back to markdown
+- Updated `missing-id` lint rule to not be auto-fixable (use `tmd enrich` instead)
+- Deleted `invalid-week-format` lint rule
+- Implemented `tmd enrich` command: converts shorthands (!,>,~,? and @today/@upcoming/@anytime/@someday), auto-generates IDs, adds created/updated dates
+- Fixed CLI help flag priority bug (command-specific --help now works correctly)
+- All 27 tests passing
+- Implemented `tmd list` command with full filtering (project, area, energy, due, overdue, status, tags, parent, top-level), sorting, grouping, and output formats (compact, full, json)
+- Implemented `tmd show <id>` command for viewing single task details with hierarchy info
+- Implemented `tmd done <id>` command with cascade to children, reindex, and --json output
+- Implemented `tmd undone <id>` command (no cascade per spec), reindex, and --json output
+- Implemented `tmd add <project> "<text>"` command with --parent for subtasks, metadata options (energy, est, due, plan, bucket, area, tags), auto ID generation
+- Created src/editor/ module with task-editor.ts, id-generator.ts, task-inserter.ts
+- Fixed hierarchy.ts bug: childrenLocalIds not populating due to duplicate localIds across projects (now uses composite key projectId:localId)
+- Added parseRelativeDate to date-utils.ts for --plan today/tomorrow support
+- Spec change: sync markers now use `<!-- tmd:start query="..." -->` / `<!-- tmd:end -->` (HTML comments, hidden in rendered MD)
+- Spec change: filter syntax unified to key:value (e.g., `status:open bucket:today`) for both CLI and sync blocks
+- Added command specs: `tmd search` (text: filter wrapper), `tmd stats` (metrics), `tmd block-template` (sync block generator)
+- Added Priority field to schema (high, normal, low) with (A)/(B)/(C) shorthand parsing in enrich command
+- Updated `tmd list` to use key:value filter syntax with new filters: priority:, bucket:, plan:, text:
+- Added priority and bucket sorting/grouping to list command
+- Implemented `tmd search` command as thin wrapper over list with text: filter
+- Implemented `tmd edit <id>` command with --energy, --priority, --due, --plan, --bucket, --area, --tags, --add-tag, --remove-tag flags
+- Implemented `tmd stats` command with byProject/byArea/byBucket/byEnergy metrics, period filtering (today, last-7d, last-30d, this-week)
+- Implemented `tmd sync` command with bidirectional sync: Phase 1 (PULL) reads done tasks from views, Phase 2 (PUSH) regenerates view blocks
+- Created src/sync/ module with tmd-block.ts (parse/replace blocks), task-renderer.ts (render tasks as markdown)
+- Added `views` array to config schema for configuring sync view files
+- Implemented `tmd block-template` command with presets (today, upcoming, anytime, someday, light, week, overdue)
+- Added `--fix` support to lint command for duplicate-tags rule (deduplicates tags in metadata)
+- Added LintFix interface and optional fix() method to LintRule
+- Updated help.ts with all new commands
+- Drafted spec for `tmd init` command (workspace scaffolding, default config, starter view, quickstart checklist)
