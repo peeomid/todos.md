@@ -39,20 +39,20 @@ On exit:
   - runs \`tmd sync\` once (if views are configured)
 
 Options:
-  --file, -f <path>    Input file (repeatable)
-  --config, -c <path>  Path to config file
-  --output, -o <path>  Override output file path
+  --file, --input, -f <path>    Input file (repeatable)
+  --config, -c <path>           Path to config file
+  --output, --out, -o <path>    Override output file path
   -h, --help           Show help
 `);
 }
 
 function parseInteractiveFlags(args: string[]): InteractiveOptions {
-  const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
-  const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
+  const valueFlags = extractFlags(args, ['--config', '-c', '--output', '--out', '-o']);
+  const fileFlags = extractMultipleFlags(args, ['--file', '--input', '-f']);
 
   const configPath = valueFlags['--config'] ?? valueFlags['-c'] ?? null;
   const config = loadConfig(configPath ?? undefined);
-  const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
+  const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['--out'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);
 
   return { files, output, config, configPath };

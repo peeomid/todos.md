@@ -113,8 +113,12 @@ Recent spec changes implemented:
 - [x] Exit behavior: reindex and run `sync` once (if views are configured)
 - [x] TUI: group all task lists by project with header rows (`projectId — project name (N task(s))`)
 - [x] TUI: improved color usage (task text vs metadata, priority/status accents)
+- [x] TUI: highlight query text in the header line
 - [x] TUI: footer always shows details + help, with separators
 - [x] TUI: active view tab highlighted in header
+- [x] TUI: double-`Ctrl+C` quits (first press shows a prompt)
+- [x] TUI: in Projects view, `[a]` adds a new project and auto-switches into that project’s drilldown view
+- [x] `tmd interactive`: allow selecting input/output via flags (`--file/--input`, `--output/--out`)
 
 ## Next Steps
 - [ ] `tmd init` - scaffold workspace (todos.md, config defaults, daily view, quickstart output)

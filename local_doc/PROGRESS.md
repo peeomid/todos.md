@@ -42,3 +42,8 @@
 - Improved TUI search UX (apply/cancel, trailing space, free-text) and added delete-with-confirmation + TUI architecture doc (2025-12-19)
 - Added `?` shorthand help overlay in the TUI (priority/bucket shorthands) (2025-12-19)
 - Changed TUI delete keybinding to `r` and made `x` an alias for toggle done (2025-12-19)
+- TUI: double-`Ctrl+C` quits (with a first-press prompt) and prompts/menus treat `Ctrl+C` like `Esc` cancel (2025-12-19)
+- TUI: highlight the `Query:` value in the header line (2025-12-19)
+- TUI: Projects view `[a]` adds a new project and auto-switches into that project’s drilldown view (2025-12-19)
+- `tmd interactive`: added `--input`/`--out` aliases for selecting input/output files (2025-12-19)
+- TUI reliability: avoid “Working…” freezes by allowing quit while busy and catching async key-handler errors (2025-12-19)

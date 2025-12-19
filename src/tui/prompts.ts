@@ -34,7 +34,7 @@ export async function showKeyMenu(
 
   return await new Promise<string | null>((resolve) => {
     const handler = (name: string) => {
-      if (name === 'ESCAPE') {
+      if (name === 'ESCAPE' || name === 'CTRL_C') {
         term.removeListener('key', handler);
         resolve(null);
         return;
@@ -102,7 +102,7 @@ export async function confirmYesNo(
   return await new Promise<boolean>((resolve) => {
     const handler = (name: string) => {
       const lower = name.toLowerCase();
-      if (name === 'ESCAPE') {
+      if (name === 'ESCAPE' || name === 'CTRL_C') {
         term.removeListener('key', handler);
         resolve(false);
         return;
@@ -187,7 +187,7 @@ export async function pickProjectTypeahead(
     const handler = (name: string) => {
       const list = filterProjects();
 
-      if (name === 'ESCAPE') {
+      if (name === 'ESCAPE' || name === 'CTRL_C') {
         term.removeListener('key', handler);
         resolve(null);
         return;

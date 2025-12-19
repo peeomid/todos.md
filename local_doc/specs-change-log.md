@@ -239,3 +239,15 @@ Default sort within bucket views:
 - `tui-architecture.md`
 
 ---
+
+## 2025-12-19: TUI QoL — Double `Ctrl+C` Quit, Header Query Highlight, Add Project
+
+### Overview
+- `Ctrl+C` is now a safe quit shortcut: first press shows a prompt; second press (within a short window) quits.
+- The header’s `Query:` value is highlighted to make the active query more noticeable.
+- Projects view adds an `[a]` action to create a new project heading and immediately switch into that project’s drilldown view.
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui.md`

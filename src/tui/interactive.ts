@@ -268,6 +268,7 @@ function render(state: SessionState, term: Term): void {
     cyan: (s: string) => (state.colorsDisabled ? term(s) : term.cyan(s)),
     blue: (s: string) => (state.colorsDisabled ? term(s) : term.blue(s)),
     bucketToday: (s: string) => (state.colorsDisabled ? term(s) : term.bold.cyan(s)),
+    queryAccent: (s: string) => (state.colorsDisabled ? term(s) : term.bold.yellow(s)),
   };
 
   function writeSegments(segments: { text: string; style: keyof typeof style }[], maxWidth: number): void {
@@ -350,7 +351,19 @@ function render(state: SessionState, term: Term): void {
   const flags = state.statusMode === 'open' ? 'hide-done' : 'show-done';
   const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}`;
   term.moveTo(1, 3);
-  style.dim(truncate(queryLine, width));
+  if (state.colorsDisabled) {
+    style.dim(truncate(queryLine, width));
+  } else {
+    writeSegments(
+      [
+        { text: `View: ${modeTitle} (${view.key}) | Query: `, style: 'dim' },
+        { text: query, style: 'queryAccent' },
+        { text: ` | Flags: ${flags}`, style: 'dim' },
+      ],
+      width
+    );
+    term.styleReset();
+  }
 
   // Separator
   term.moveTo(1, 4);
@@ -575,8 +588,11 @@ function render(state: SessionState, term: Term): void {
   const help1 = '[j/k/↑/↓] move  [g/G] top/bot  [h/l/←/→] views  [/] search  [z] show/hide done  [q] quit';
   style.dim(truncate(help1, width));
   term.moveTo(1, footerTop + 6);
-  const help2 =
-    '[space/x] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [r] remove  [?] shorthands';
+  const help2 = isProjectsList
+    ? '[Enter] open project  [a] add project  [?] shorthands'
+    : view.kind === 'projects' && state.projects.drilldownProjectId
+      ? '[Esc/Backspace] back  [space/x] done  [p] pri  [b] bucket  [n] plan  [d] due  [e] edit  [a] add task  [r] remove'
+      : '[space/x] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [r] remove  [?] shorthands';
   style.dim(truncate(help2, width));
 
   term.moveTo(1, footerTop + 7);
@@ -892,6 +908,9 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   const exitPromise = new Promise<void>((resolve) => {
     resolveExit = resolve;
   });
+
+  let ctrlCArmedAt: number | null = null;
+  let ctrlCResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   function refreshFromDisk(): void {
     refreshIndex(state, options.files);
@@ -1325,6 +1344,156 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     recompute(state);
   }
 
+  function slugifyProjectId(input: string): string {
+    const lower = input.trim().toLowerCase();
+    const replaced = lower.replace(/[^a-z0-9]+/g, '-');
+    return replaced.replace(/^-+/, '').replace(/-+$/, '');
+  }
+
+  function defaultProjectHeadingLevelForFile(filePath: string): number {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      const counts = new Map<number, number>();
+      for (const line of lines) {
+        const m = line.match(/^(#{1,6})\s+.+\[.*project:([^\s\]]+)/);
+        if (!m?.[1]) continue;
+        const level = m[1].length;
+        counts.set(level, (counts.get(level) ?? 0) + 1);
+      }
+      const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+      return ranked[0]?.[0] ?? 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  function appendProjectHeadingToFile(args: {
+    filePath: string;
+    headingLevel: number;
+    projectId: string;
+    name: string;
+    area?: string;
+  }): void {
+    const { filePath, headingLevel, projectId, name, area } = args;
+    const hashes = '#'.repeat(clamp(headingLevel, 1, 6));
+    const meta = area ? ` [project:${projectId} area:${area}]` : ` [project:${projectId}]`;
+    const heading = `${hashes} ${name}${meta}`;
+
+    const existing = fs.readFileSync(filePath, 'utf-8');
+    const endsWithNewline = existing.endsWith('\n');
+    const base = endsWithNewline ? existing : `${existing}\n`;
+    const trimmedEnd = base.replace(/\s+$/, '');
+    const sep = trimmedEnd.length === 0 ? '' : '\n\n';
+    const next = `${trimmedEnd}${sep}${heading}\n\n`;
+    fs.writeFileSync(filePath, next, 'utf-8');
+  }
+
+  async function addProjectFlow(): Promise<void> {
+    const files = options.files;
+    if (files.length === 0) {
+      state.message = 'No input files configured';
+      return;
+    }
+
+    let filePath: string;
+    if (files.length <= 9) {
+      const lines = files.map((f, idx) => `[${idx + 1}] ${f}`);
+      const allowed = files.map((_, idx) => String(idx + 1));
+      const chosen = await showKeyMenu(
+        term,
+        'Add project → choose file',
+        [...lines, '', '[Enter] default (1)'],
+        allowed,
+        state.colorsDisabled,
+        { enter: '1' }
+      );
+      if (!chosen) return;
+      filePath = files[Number.parseInt(chosen, 10) - 1] ?? files[0]!;
+    } else {
+      const input = await promptText(
+        term,
+        'Add project → choose file',
+        'File path:',
+        files[0] ?? '',
+        state.colorsDisabled
+      );
+      if (input === null) return;
+      filePath = input.trim();
+    }
+
+    if (!filePath) return;
+    if (!fs.existsSync(filePath)) {
+      state.message = `File not found: ${filePath}`;
+      return;
+    }
+
+    const suggestedLevel = defaultProjectHeadingLevelForFile(filePath);
+    const levelChoice = await showKeyMenu(
+      term,
+      'Add project → heading level',
+      ['[1] # (top-level)', '[2] ## (nested)', '', `[Enter] default (${suggestedLevel === 2 ? '##' : '#'})`],
+      ['1', '2'],
+      state.colorsDisabled,
+      { enter: suggestedLevel === 2 ? '2' : '1' }
+    );
+    if (!levelChoice) return;
+    const headingLevel = levelChoice === '2' ? 2 : 1;
+
+    const nameInput = await promptText(term, 'Add project', 'Project name:', '', state.colorsDisabled);
+    if (nameInput === null) return;
+    const name = nameInput.trim();
+    if (!name) {
+      state.message = 'Project name is required';
+      return;
+    }
+
+    const suggestedId = slugifyProjectId(name);
+    const idInput = await promptText(
+      term,
+      'Add project',
+      'Project id (slug):',
+      suggestedId,
+      state.colorsDisabled
+    );
+    if (idInput === null) return;
+    const projectId = slugifyProjectId(idInput);
+    if (!projectId || !/^[a-z0-9][a-z0-9-]*$/.test(projectId)) {
+      state.message = `Invalid project id: ${idInput}`;
+      return;
+    }
+    if (state.index.projects[projectId]) {
+      state.message = `Project already exists: ${projectId}`;
+      return;
+    }
+
+    const areaInput = await promptText(term, 'Add project', 'Area (optional):', '', state.colorsDisabled);
+    if (areaInput === null) return;
+    const area = areaInput.trim() || undefined;
+
+    const res = await ensureFileFresh(term, state, filePath, refreshFromDisk);
+    if (!res.ok) return;
+    if (state.index.projects[projectId]) {
+      state.message = `Project already exists: ${projectId}`;
+      return;
+    }
+
+    appendProjectHeadingToFile({ filePath, headingLevel, projectId, name, area });
+    refreshFromDisk();
+
+    const projectsViewIdx = state.views.findIndex((v) => v.key === '5');
+    if (projectsViewIdx !== -1) {
+      state.viewIndex = projectsViewIdx;
+    }
+    state.projects.drilldownProjectId = projectId;
+    state.search.active = false;
+    state.search.input = '';
+    state.query = getEffectiveQuery(state);
+    state.selection = { row: 0, scroll: 0, selectedId: null };
+    recompute(state);
+    state.message = `Created project ${projectId}`;
+  }
+
   function findNeighborTaskIdForDeletion(): string | null {
     const start = state.selection.row;
     const rows = state.renderRows;
@@ -1399,8 +1568,47 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   }
 
   const keyHandler = async (name: string): Promise<void> => {
-    state.message = null;
+    if (name === 'CTRL_C') {
+      const now = Date.now();
+      if (ctrlCArmedAt !== null && now - ctrlCArmedAt <= 1000) {
+        resolveExit?.();
+        return;
+      }
+
+      ctrlCArmedAt = now;
+      if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
+      ctrlCResetTimer = setTimeout(() => {
+        ctrlCArmedAt = null;
+        if (state.message === 'Press Ctrl+C again to quit') {
+          state.message = null;
+        }
+      }, 1000);
+
+      if (state.search.active) {
+        state.search.active = false;
+        state.search.input = '';
+        recompute(state);
+      }
+
+      state.message = 'Press Ctrl+C again to quit';
+      render(state, term);
+      return;
+    }
+
+    // Allow quitting even if a flow is mid-flight (e.g. a stuck prompt).
+    if (name === 'q') {
+      resolveExit?.();
+      return;
+    }
+
     if (state.busy) return;
+    state.message = null;
+
+    if (ctrlCArmedAt !== null) {
+      ctrlCArmedAt = null;
+      if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
+      ctrlCResetTimer = null;
+    }
 
     const view = state.views[state.viewIndex]!;
     const isProjectsList = view.kind === 'projects' && !state.projects.drilldownProjectId;
@@ -1428,7 +1636,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         render(state, term);
         return;
       }
-      if (name === 'ESCAPE' || name === 'CTRL_C') {
+      if (name === 'ESCAPE') {
         state.search.active = false;
         state.search.input = '';
         recompute(state);
@@ -1544,6 +1752,20 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         state.projects.drilldownProjectId = p.id;
         state.query = getEffectiveQuery(state);
         state.selection = { row: 0, scroll: 0, selectedId: null };
+        recompute(state);
+        render(state, term);
+      }
+      return;
+    }
+
+    // Projects list: add project
+    if (isProjectsList && name === 'a') {
+      state.busy = true;
+      render(state, term);
+      try {
+        await addProjectFlow();
+      } finally {
+        state.busy = false;
         recompute(state);
         render(state, term);
       }
@@ -1747,7 +1969,19 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   };
 
   const onKey = (name: string): void => {
-    void keyHandler(name);
+    void keyHandler(name).catch((error: unknown) => {
+      state.busy = false;
+      state.search.active = false;
+      state.search.input = '';
+      ctrlCArmedAt = null;
+      if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
+      ctrlCResetTimer = null;
+
+      const msg = error instanceof Error ? error.message : String(error);
+      state.message = `Error: ${msg}`;
+      recompute(state);
+      render(state, term);
+    });
   };
 
   const onResize = (): void => {
@@ -1764,6 +1998,10 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     render(state, term);
     await exitPromise;
   } finally {
+    if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
+    ctrlCResetTimer = null;
+    ctrlCArmedAt = null;
+
     term.removeListener('key', onKey);
     process.stdout.removeListener('resize', onResize);
     term.grabInput(false);

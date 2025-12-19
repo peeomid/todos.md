@@ -105,6 +105,9 @@ Use a small, meaningful color palette:
 
  * Task text: normal/bright.
  * Metadata (IDs, dates, estimates): dim by default; highlight key dates (e.g. `plan:`/`due:`) with an accent.
+* **Header query**:
+
+ * The `Query:` value in the header should use a distinct accent color (so it’s noticeable even when the rest of the header is dim).
 * **Bucket** (in details or small tag in list):
 
  * `today` – accent (e.g. cyan) and the bucket shorthand (`!`) should be clearly visible.
@@ -177,6 +180,7 @@ Built-ins (v1):
  * `name: "Projects"`
  * Shows a list of projects, not tasks.
  * Selecting a project opens a project-specific task list (like `status:open project:<id>`).
+ * `[a]` adds a new project and immediately switches into that project’s drilldown view.
 
 Rendering rule (v1):
 * All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are **grouped by project** with a header row:
@@ -216,6 +220,7 @@ Custom views are part of the view cycle (`h/l` / left/right).
 ### 4.1. Global navigation
 
 * `q` – quit interactive mode.
+* `Ctrl+C` – quit interactive mode if pressed twice (first press shows a prompt).
 Help is always displayed at the bottom (below the details panel).
 * `r` – refresh (re-read `todos.json` without restarting; optional v2).
 * `0–9` – jump to specific view (0 = All, 1 = Today, etc.).

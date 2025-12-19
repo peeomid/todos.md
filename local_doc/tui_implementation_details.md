@@ -83,6 +83,7 @@ Rendering:
 
 Global:
 - `q` quit
+- `Ctrl+C` quits if pressed twice (first press shows a prompt)
 - `0–9` jump to view
 - `h/l` or `←/→` previous/next view
 - `z` show/hide done (query rewrite)
@@ -115,6 +116,7 @@ Task actions:
 
 Projects view:
 - `Enter` drills down into a project (shows that project’s tasks)
+- `a` adds a new project (writes a new project heading and switches into that project’s drilldown view)
 - `Esc`/`Backspace` exits drilldown
 
 ## Write Path / Safety

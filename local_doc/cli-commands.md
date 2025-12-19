@@ -23,8 +23,9 @@ For detailed specifications, see individual files in the `commands/` folder.
 | `tmd stats` | Show task statistics and completion metrics | 3 | ✅ Done |
 | `tmd sync` | Bidirectional sync with view files | 4 | ✅ Done |
 | `tmd block-template` | Generate sync block skeleton for copy-paste | 4 | ✅ Done |
-| `tmd init` | Scaffold markdown, config, and view files for a workspace | 5 | ⏳ Pending |
-| `tmd config` | Configuration subcommands (init, get, set) | 5 | ⏳ Pending |
+| `tmd interactive (i)` | Full-screen interactive TUI | 4.5 | ✅ Done |
+| `tmd init` | Scaffold markdown, config, and view files for a workspace | 5 | ✅ Done |
+| `tmd config` | Configuration subcommands (init, get, set) | 5 | ✅ Done |
 
 ---
 
@@ -179,6 +180,26 @@ tmd block-template 'status:open project:as-onb' --name "as-onb-tasks"
 
 ---
 
+## Tier 4.5: Interactive (TUI)
+
+### `tmd interactive` / `tmd i`
+
+Launch the full-screen interactive terminal UI.
+
+```bash
+tmd interactive
+tmd i
+```
+
+Options:
+
+```bash
+tmd interactive --file todos.md --output todos.json
+tmd interactive --input todos.md --out todos.json
+```
+
+---
+
 ## Tier 5: Configuration & Setup
 
 Bootstrap and manage workspace configuration.
@@ -243,4 +264,5 @@ Available on all commands:
 2. **Phase 2**: `done`, `undone`, `add`, `search` (write operations + search) ✅
 3. **Phase 3**: `edit`, `stats` (advanced editing + analytics) ✅
 4. **Phase 4**: `sync`, `block-template` (file sync + views) ✅
-5. **Phase 5**: `init`, `config` subcommands (pending)
+5. **Phase 5**: `init`, `config` subcommands ✅
+6. **Phase 6**: `interactive` (TUI) ✅
