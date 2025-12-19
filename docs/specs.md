@@ -3,7 +3,7 @@
 This document explains how I write todos in my Markdown notes so that:
 
 * They are easy to read as normal text.
-* A script or AI can parse them and build a `tasks.json` index.
+* A script or AI can parse them and build a `todos.json` index (configurable).
 * I can generate daily/weekly/light-task views from them later.
 
 Everything stays in plain-text Markdown.

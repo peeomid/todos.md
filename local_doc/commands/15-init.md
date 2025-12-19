@@ -41,7 +41,7 @@ tmd init [options]
 tmd init
 
 # Custom file names
-tmd init --file projects/tasks.md --output projects/tasks.json
+tmd init --file projects/tasks.md --output projects/todos.json
 
 # Skip config and include index scaffold
 tmd init --no-config --with-index

@@ -17,7 +17,7 @@
 
   * Reads the Markdown files directly.
   * Helps me manage knowledge, notes, and todos.
-  * Can be extended to use a structured task index (`tasks.json`) and simple APIs/CLI tools.
+  * Can be extended to use a structured task index (`todos.json`, configurable) and simple APIs/CLI tools.
 
 ---
 
@@ -181,13 +181,13 @@ I want a small, consistent set of standard keys, plus flexibility for custom one
 
 * I’m okay writing and maintaining small tools/scripts:
 
-  * A **parser** to scan Markdown and build a `tasks.json` index.
+  * A **parser** to scan Markdown and build a `todos.json` index (configurable).
   * A **view generator** to create/update daily/weekly/light-tasks Markdown files.
   * A **linter** to check for format issues (duplicate IDs, bad dates, malformed metadata clusters).
 * My **local AI agent** is expected to:
 
   * Read the Markdown files directly.
-  * Optionally read `tasks.json` for structured queries.
+  * Optionally read `todos.json` for structured queries.
   * Possibly interact with a small CLI or local API that:
 
     * Lists tasks,

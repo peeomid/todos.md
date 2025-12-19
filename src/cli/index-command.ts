@@ -115,7 +115,7 @@ export function printIndexHelp(): void {
     'Examples:',
     '  tmd index',
     '  tmd index -f todos.md -f projects/work.md',
-    '  tmd index --output my-tasks.json',
+    '  tmd index --output todos.json',
   ];
   console.log(lines.join('\n'));
 }

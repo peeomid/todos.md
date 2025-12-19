@@ -51,7 +51,7 @@ Parse specified markdown files, extract tasks and projects, generate `todos.json
 tmd index
 tmd index --file todos.md
 tmd index -f todos.md -f projects/work.md
-tmd index --output my-tasks.json
+tmd index --output todos.json
 ```
 
 ### `tmd enrich`
@@ -217,7 +217,7 @@ tmd config get output
 Set a configuration value.
 
 ```bash
-tmd config set output tasks.json
+tmd config set output todos.json
 ```
 
 ---

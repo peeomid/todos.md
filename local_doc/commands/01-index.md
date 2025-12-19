@@ -43,7 +43,7 @@ tmd index --file todos.md
 tmd index -f todos.md -f projects/work.md -f projects/personal.md
 
 # Specify output file
-tmd index --output my-tasks.json
+tmd index --output todos.json
 
 # Quiet mode for scripts
 tmd index --quiet

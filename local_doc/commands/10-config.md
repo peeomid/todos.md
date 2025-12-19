@@ -144,7 +144,7 @@ tmd config set <key> <value> [options]
 
 ```bash
 # Set output file
-tmd config set output tasks.json
+tmd config set output todos.json
 
 # Set nested value
 tmd config set defaults.area personal
@@ -156,7 +156,7 @@ tmd config set defaultProject notes --global
 ### Output
 
 ```
-Set output = tasks.json
+Set output = todos.json
   File: .todosmd.json
 ```
 

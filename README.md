@@ -20,7 +20,7 @@ tmd index
 
 # With options
 tmd lint -f todos.md --json
-tmd index -f todos.md -f projects/work.md -o tasks.json
+tmd index -f todos.md -f projects/work.md -o todos.json
 ```
 
 ## Quick Example
