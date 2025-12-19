@@ -35,7 +35,7 @@ Added keys:
   - `"project"` (default): group all task lists by project with header rows
   - `"none"`: disable grouping and render a flat list
 - `interactive.colors.disable`: disables ANSI styling in the TUI (best-effort)
-- `interactive.defaultProject`: used by `a` (add task) when not in a project drilldown
+- `interactive.defaultProject`: Inbox project id fallback used by `a` (add task) only when the destination cannot be inferred from list context
 
 Built-in views:
 - `0` All: `status:open`
@@ -107,7 +107,9 @@ Task actions:
 - `e` edit menu:
   - `t` edits task text only
   - `m` edits metadata block only (`[key:value ...]`)
-- `a` add task flow (text → priority → bucket → plan → due)
+- `a` add task flow (choose destination project → text → priority → bucket → plan → due)
+  - Defaults destination by context: project drilldown → single-project list → selected task’s project → `interactive.defaultProject`
+  - `Tab` opens a typeahead project picker before entering task text
 
 Projects view:
 - `Enter` drills down into a project (shows that project’s tasks)

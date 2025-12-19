@@ -117,3 +117,6 @@ Task actions:
 - `x` delete (with confirmation; deletes subtree)
 - `p/b/n/d/e/a` (priority/bucket/plan/due/edit/add)
 
+Add destination:
+- `a` chooses a destination project by context: project drilldown → single-project list → selected task’s project → Inbox fallback (`interactive.defaultProject`, default `"inbox"`).
+- Before entering task text, `Tab` opens a typeahead project picker to change the destination, and the add header always shows `Add task → <projectId> — <project name>`.

@@ -28,9 +28,10 @@ import {
   formatPriorityShorthand,
   getTaskShorthandTokens,
 } from './task-shorthands.js';
-import { confirmYesNo, promptText, showKeyMenu } from './prompts.js';
+import { confirmYesNo, pickProjectTypeahead, promptText, showKeyMenu } from './prompts.js';
 import { setCursorVisible } from './term-cursor.js';
 import { runEditFlow } from './edit-flow.js';
+import { decideAddTargetProjectId } from './add-target.js';
 
 type Term = any;
 
@@ -574,7 +575,7 @@ function render(state: SessionState, term: Term): void {
   style.dim(truncate(help1, width));
   term.moveTo(1, footerTop + 6);
   const help2 =
-    '[space] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add  [x] delete  [Enter] project';
+    '[space] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [x] delete  [Enter] project';
   style.dim(truncate(help2, width));
 
   term.moveTo(1, footerTop + 7);
@@ -1164,20 +1165,91 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   }
 
   async function addTaskFlow(): Promise<void> {
-    const view = state.views[state.viewIndex]!;
-    const inProject = state.projects.drilldownProjectId;
-    const defaultProject = options.config.interactive?.defaultProject ?? 'inbox';
-    const targetProject = inProject ?? defaultProject;
+    const inboxProjectId = options.config.interactive?.defaultProject ?? 'inbox';
+    const selectedTask = getSelectedTask(state);
+    const decision = decideAddTargetProjectId({
+      index: state.index,
+      drilldownProjectId: state.projects.drilldownProjectId,
+      filteredTasks: state.filteredTasks,
+      selectedTask,
+      inboxProjectId,
+    });
 
-    const res = await ensureFileFresh(
-      term,
-      state,
-      state.index.projects[targetProject]?.filePath ?? options.files[0]!,
-      refreshFromDisk
-    );
+    let targetProjectId = decision.projectId;
+    if (!targetProjectId) {
+      // No inferred project and no Inbox project exists; force explicit selection.
+      const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
+      const picked = await pickProjectTypeahead(
+        term,
+        'Choose project',
+        projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
+        '',
+        state.colorsDisabled
+      );
+      if (!picked) return;
+      targetProjectId = picked;
+    }
+
+    // Always show destination and allow changing it via Tab before entering text.
+    while (true) {
+      const project = state.index.projects[targetProjectId];
+      if (!project) {
+        state.message = `Project '${targetProjectId}' not found. Re-run index.`;
+        return;
+      }
+
+      term.clear();
+      term.moveTo(1, 1);
+      const title = `Add task → ${project.id} — ${project.name}`;
+      (state.colorsDisabled ? term : term.bold)(title);
+      term.moveTo(1, 3);
+      term('Press Enter to continue, Tab to change project, Esc to cancel');
+
+      const choice = await new Promise<'continue' | 'change' | 'cancel'>((resolve) => {
+        const handler = (name: string) => {
+          if (name === 'ESCAPE') {
+            term.removeListener('key', handler);
+            resolve('cancel');
+            return;
+          }
+          if (name === 'TAB') {
+            term.removeListener('key', handler);
+            resolve('change');
+            return;
+          }
+          if (name === 'ENTER') {
+            term.removeListener('key', handler);
+            resolve('continue');
+          }
+        };
+        term.on('key', handler);
+      });
+
+      if (choice === 'cancel') return;
+      if (choice === 'change') {
+        const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
+        const picked = await pickProjectTypeahead(
+          term,
+          'Choose project',
+          projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
+          project.id,
+          state.colorsDisabled
+        );
+        if (!picked) continue;
+        targetProjectId = picked;
+        continue;
+      }
+
+      break;
+    }
+
+    const targetProject = targetProjectId;
+
+    const res = await ensureFileFresh(term, state, state.index.projects[targetProject]!.filePath, refreshFromDisk);
     if (!res.ok) return;
 
-    const text = await promptText(term, `Add task (${targetProject})`, 'Task text:', '', state.colorsDisabled);
+    const proj = state.index.projects[targetProject]!;
+    const text = await promptText(term, `Add task → ${proj.id} — ${proj.name}`, 'Task text:', '', state.colorsDisabled);
     if (!text) return;
 
     const priorityKey = await showKeyMenu(

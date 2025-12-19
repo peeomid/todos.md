@@ -473,15 +473,19 @@ Later (optional): support `$EDITOR` integration.
 
 * Key: `a` – add a new task.
 
-Context rules:
+Project targeting (must be explicit to the user):
 
-* In project-specific task view: new task belongs to that project.
-* In All/Today/Upcoming/Anytime/Someday:
-
- * Default to `Inbox` project (or last used project) unless otherwise chosen.
+* The add flow always shows the destination project in the header: `Add task → <projectId> — <project name>`.
+* Default project selection (in order):
+  1. If in Projects drilldown, add to that project.
+  2. If the current list contains tasks from exactly one project, add to that project.
+  3. Otherwise, default to the selected task’s project.
+  4. Otherwise, fall back to Inbox (`interactive.defaultProject`, default `"inbox"`).
+* `Tab` opens a fast typeahead project picker to change the destination.
 
 Flow:
 
+0. Choose destination project (defaulted per rules above; user can press `Tab` to change).
 1. Prompt: `Task text: _`
 2. Prompt: `Priority [h=high, n=normal, l=low, Enter=normal]:`
 3. Prompt: `Bucket [t=today, u=upcoming, a=anytime, s=someday, Enter=none]:`
