@@ -115,17 +115,21 @@ function parseAddFlags(args: string[]): AddOptions {
   // Parse plan date
   let plan = valueFlags['--plan'];
   if (plan) {
-    if (plan === 'today' || plan === 'tomorrow') {
-      plan = parseRelativeDate(plan);
-    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(plan)) {
-      throw new CliUsageError(`Invalid plan date: '${plan}'. Use YYYY-MM-DD, 'today', or 'tomorrow'.`);
+    const parsed = parseRelativeDate(plan);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
+      throw new CliUsageError(`Invalid plan date: '${plan}'. Use YYYY-MM-DD, 'today', 'tomorrow', +Nd, or +Nw.`);
     }
+    plan = parsed;
   }
 
   // Validate due date format
-  const due = valueFlags['--due'];
-  if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) {
-    throw new CliUsageError(`Invalid due date: '${due}'. Use YYYY-MM-DD format.`);
+  let due = valueFlags['--due'];
+  if (due) {
+    const parsed = parseRelativeDate(due);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
+      throw new CliUsageError(`Invalid due date: '${due}'. Use YYYY-MM-DD, 'today', 'tomorrow', +Nd, or +Nw.`);
+    }
+    due = parsed;
   }
 
   return {

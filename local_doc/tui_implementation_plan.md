@@ -4,6 +4,8 @@ Source spec: `local_doc/tui_specs.md`.
 
 This plan describes how to implement the interactive full-screen terminal UI for `tmd` while preserving the existing “Markdown is canonical” workflow.
 
+**Status:** Implemented on 2025-12-19. See `local_doc/tui_implementation_details.md`.
+
 ---
 
 ## Goals (v1)
@@ -13,6 +15,7 @@ This plan describes how to implement the interactive full-screen terminal UI for
 - Views: built-ins `0–5` + custom views from config; view cycling via `h/l` and arrows.
 - In-view live search (`/`) with scope toggle (view/global), live filtering on each keypress.
 - Global show/hide done toggle (`z`) rewrites the current query (`status:open` ↔ `status:all`).
+- Task list rendering is grouped by project in all task views, using a header row: `projectId — project name (count)`.
 - Task actions: toggle done (space), set priority (`p`), bucket (`b`), plan (`n`), due (`d`), edit (`e`), add (`a`).
 - Edits write to Markdown files immediately, update in-memory tasks immediately, and reindex again on exit.
 - Soft protection: detect external file edits with `mtime` and prompt before writing.
@@ -131,6 +134,7 @@ Acceptance:
 
 - Extend config schema to support interactive-specific settings in JSON:
   - `interactive.views[]`: `{ key, name, query, sort? }`
+  - `interactive.groupBy`: `"project"` (default) | `"none"`
   - `interactive.colors.disable` (optional)
 - Implement built-in views `0–5`:
   - `0 All`: `status:open` (default); `z` toggles to `status:all`
@@ -272,3 +276,12 @@ Acceptance:
 - Projects view details:
   - sorting projects (by id/name/area)
   - what the “project task list” default sort should be
+
+## Implementation Notes (What Landed)
+
+- Command wiring: `tmd interactive` + alias `tmd i`.
+- Config: `interactive.views[]`, `interactive.groupBy`, `interactive.colors.disable`, `interactive.defaultProject`.
+- Shared query logic extracted to `src/query/filters.ts` and re-used by the TUI.
+- Implemented navigation, live search, status toggle (`z`), project drilldown, and all v1 task actions.
+- Implemented `mtime` protection prompt before any write.
+- Exit behavior: reindex in-process and run `sync` once if `views` are configured.

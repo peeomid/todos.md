@@ -101,15 +101,27 @@ Recent spec changes implemented:
 - [x] `tmd block-template` - generate sync block skeletons with presets (today, upcoming, anytime, someday, light, week, overdue)
 - [x] `--fix` support in lint for duplicate-tags rule
 
+## Phase 8: Interactive TUI [DONE]
+- [x] `tmd interactive` command + `tmd i` alias
+- [x] Built-in views `0–5` + custom views via config (`interactive.views[]`)
+- [x] Live search (`/`) with scope toggle, and `z` show/hide done query rewrite
+- [x] Search UX: `/` prefill includes trailing space; plain words behave like `text:`; `Enter` applies query; `Esc` cancels
+- [x] Task actions: toggle done (with cascade), priority/bucket/plan/due menus, inline edit, add flow
+- [x] Task delete: `x` with confirmation (deletes indented subtree)
+- [x] External edit protection via `mtime` prompt before writes
+- [x] Exit behavior: reindex and run `sync` once (if views are configured)
+- [x] TUI: group all task lists by project with header rows (`projectId — project name (N task(s))`)
+- [x] TUI: improved color usage (task text vs metadata, priority/status accents)
+- [x] TUI: footer always shows details + help, with separators
+- [x] TUI: active view tab highlighted in header
+
 ## Next Steps
 - [ ] `tmd init` - scaffold workspace (todos.md, config defaults, daily view, quickstart output)
-- [ ] `tmd config init` - create .todosmd.json configuration file
-- [ ] `tmd config get/set` - get/set configuration values
-- [ ] Wire auto-sync into done/undone/add/edit commands (respect `--no-sync`)
-- [ ] Ensure sync pull phase cascades completion via `tmd done`
-- [ ] Parse and honor `--file/-f` overrides in mutation commands
-- [ ] Expand CLI tests for file resolution (flags vs project/global config)
-- [ ] Add regression tests for auto-sync behaviour and sync cascades before fixing
+- [ ] TUI v2: `$EDITOR` integration for `e` (open file at line)
+- [ ] TUI v2: `r` refresh to reload index without restarting
+- [ ] TUI v2: smoother rendering (buffered/diff rendering to reduce flicker)
+- [ ] TUI v2: project view sorting and project stats summary
+
 
 ## Test Cases: Multi-Level Project Hierarchies
 

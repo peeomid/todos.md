@@ -13,6 +13,8 @@ import { handleSearchCommand, printSearchHelp } from './cli/search-command.js';
 import { handleStatsCommand, printStatsHelp } from './cli/stats-command.js';
 import { handleSyncCommand, printSyncHelp } from './cli/sync-command.js';
 import { handleBlockTemplateCommand, printBlockTemplateHelp } from './cli/block-template-command.js';
+import { handleInteractiveCommand, printInteractiveHelp } from './cli/interactive-command.js';
+import { handleConfigCommand, printConfigHelp } from './cli/config-command.js';
 import { CliUsageError } from './cli/errors.js';
 import { extractBooleanFlags } from './cli/flag-utils.js';
 
@@ -89,6 +91,15 @@ async function main(): Promise<void> {
         }
         break;
 
+      case 'interactive':
+      case 'i':
+        if (showHelp) {
+          printInteractiveHelp();
+        } else {
+          await handleInteractiveCommand(args);
+        }
+        break;
+
       case 'show':
         if (showHelp) {
           printShowHelp();
@@ -161,11 +172,13 @@ async function main(): Promise<void> {
         }
         break;
 
-      case 'config': {
-        console.error(`Command '${command}' is not yet implemented.`);
-        process.exit(1);
+      case 'config':
+        if (showHelp) {
+          printConfigHelp();
+        } else {
+          handleConfigCommand(args);
+        }
         break;
-      }
 
       default:
         printHelp(`Unknown command '${command}'.`);

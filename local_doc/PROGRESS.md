@@ -32,3 +32,11 @@
 - Added LintFix interface and optional fix() method to LintRule
 - Updated help.ts with all new commands
 - Drafted spec for `tmd init` command (workspace scaffolding, default config, starter view, quickstart checklist)
+- Implemented `tmd interactive` / `tmd i` full-screen TUI (2025-12-19): views 0–5 + config views, live search, task editing, `mtime` safety, reindex+sync on exit
+- Extracted shared query logic to `src/query/filters.ts` and extended sorting for TUI (stable multi-sort, includes plan)
+- Extended date parsing to support `+Nd` and `+Nw` shortcuts (used by TUI and `tmd add`)
+- Updated TUI task lists to group by project (all views) and improved color styling for task text vs metadata (2025-12-19)
+- Updated TUI footer to always show help below task details (2025-12-19)
+- Updated TUI header tabs to highlight the current view with a background color (2025-12-19)
+- Added footer separator line between details and help in the TUI (2025-12-19)
+- Improved TUI search UX (apply/cancel, trailing space, free-text) and added delete-with-confirmation + TUI architecture doc (2025-12-19)

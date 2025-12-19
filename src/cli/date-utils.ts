@@ -85,6 +85,15 @@ export function parseRelativeDate(spec: string): string {
   const now = new Date();
   const today = startOfDay(now);
 
+  const relativeMatch = spec.match(/^\+(\d+)([dw])$/i);
+  if (relativeMatch) {
+    const amount = Number(relativeMatch[1]);
+    const unit = relativeMatch[2]!.toLowerCase();
+    const result = new Date(today);
+    result.setDate(result.getDate() + (unit === 'w' ? amount * 7 : amount));
+    return formatDate(result);
+  }
+
   switch (spec.toLowerCase()) {
     case 'today':
       return formatDate(today);

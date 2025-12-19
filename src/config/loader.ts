@@ -6,6 +6,27 @@ export const ConfigSchema = z.object({
   files: z.array(z.string()).default(['todos.md']),
   output: z.string().default('todos.json'),
   views: z.array(z.string()).optional(),
+  interactive: z
+    .object({
+      views: z
+        .array(
+          z.object({
+            key: z.string(),
+            name: z.string(),
+            query: z.string(),
+            sort: z.string().optional(),
+          })
+        )
+        .optional(),
+      groupBy: z.enum(['project', 'none']).optional(),
+      colors: z
+        .object({
+          disable: z.boolean().optional(),
+        })
+        .optional(),
+      defaultProject: z.string().optional(),
+    })
+    .optional(),
   defaults: z
     .object({
       area: z.string().optional(),
@@ -17,12 +38,26 @@ export const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema>;
 
 const CONFIG_FILENAME = '.todosmd.json';
-const GLOBAL_CONFIG_PATH = path.join(
+const DEFAULT_GLOBAL_CONFIG_PATH = path.join(
   process.env.HOME ?? process.env.USERPROFILE ?? '',
   '.config',
   'todosmd',
   'config.json'
 );
+
+export function getDefaultProjectConfigPath(startDir: string = process.cwd()): string {
+  return path.join(startDir, CONFIG_FILENAME);
+}
+
+export function getGlobalConfigPath(): string {
+  // Recompute each call so tests that stub HOME behave correctly.
+  return path.join(
+    process.env.HOME ?? process.env.USERPROFILE ?? '',
+    '.config',
+    'todosmd',
+    'config.json'
+  );
+}
 
 export function findConfigPath(startDir: string = process.cwd()): string | null {
   let dir = startDir;
@@ -41,7 +76,7 @@ export function findConfigPath(startDir: string = process.cwd()): string | null 
 }
 
 export function loadConfig(configPath?: string): Config {
-  const pathToLoad = configPath ?? findConfigPath() ?? GLOBAL_CONFIG_PATH;
+  const pathToLoad = configPath ?? findConfigPath() ?? getGlobalConfigPath() ?? DEFAULT_GLOBAL_CONFIG_PATH;
 
   if (!fs.existsSync(pathToLoad)) {
     return ConfigSchema.parse({});

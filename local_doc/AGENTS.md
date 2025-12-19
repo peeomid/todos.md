@@ -38,6 +38,15 @@ The tool follows patterns from [mcporter](https://github.com/steipete/mcporter).
 | `cli-architecture.md` | **Overall architecture**. Project structure, config resolution, ID system, index schema, dependencies. The main technical reference for implementation decisions. |
 | `cli-commands.md` | **Command summary**. Quick reference of all CLI commands with priorities (Tier 1-6). Start here to understand what commands exist. |
 
+### Interactive TUI (`tmd interactive`)
+
+| File | Description |
+|------|-------------|
+| `tui_specs.md` | **TUI requirements/spec**: screen layout, views, keybindings, color guidance, and grouping rules. |
+| `tui-architecture.md` | **TUI technical architecture**: state model, query/filter pipeline, write safety, and delete semantics. |
+| `tui_implementation_plan.md` | **Implementation plan + rationale** for the TUI (milestones, non-goals, approach). |
+| `tui_implementation_details.md` | **Implementation map**: entry points, config keys, state model, rendering, keybindings, write path. |
+
 ### Command Specifications
 
 Each command has a detailed spec in `commands/`:
@@ -59,6 +68,15 @@ Each command has a detailed spec in `commands/`:
 | `commands/12-search.md` | `tmd search` | Tier 2 - Full-text search (wrapper over list) |
 | `commands/13-stats.md` | `tmd stats` | Tier 3 - Task statistics and metrics |
 | `commands/14-block-template.md` | `tmd block-template` | Tier 4 - Generate sync block skeletons |
+
+### TUI Code Entry Points (for implementation work)
+
+| File | Notes |
+|------|------|
+| `src/cli/interactive-command.ts` | CLI wiring: `tmd interactive` / `tmd i`; startup (enrich→index→load) and exit (reindex→sync). |
+| `src/tui/interactive.ts` | TUI runtime: rendering, grouping, key handling, file edits, safety prompts. |
+| `src/query/filters.ts` | Shared query parsing/filtering/sorting; includes `groupTasks()` used by CLI and TUI. |
+| `src/config/loader.ts` | Config schema; interactive keys live under `interactive.*` (e.g. `views`, `groupBy`, `colors.disable`). |
 
 ### Lint Rules
 

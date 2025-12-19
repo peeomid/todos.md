@@ -10,6 +10,7 @@ export interface InsertResult {
 export interface TaskMetadata {
   id: string;
   energy?: 'low' | 'normal' | 'high';
+  priority?: 'high' | 'normal' | 'low';
   est?: string;
   due?: string;
   plan?: string;
@@ -29,34 +30,27 @@ export interface TaskMetadata {
  */
 export function buildTaskLine(text: string, metadata: TaskMetadata, indentLevel: number = 0): string {
   const indent = '  '.repeat(indentLevel);
-  const metaParts: string[] = [`id:${metadata.id}`];
+  const meta: Record<string, string> = { id: metadata.id };
+  if (metadata.energy) meta.energy = metadata.energy;
+  if (metadata.priority) meta.priority = metadata.priority;
+  if (metadata.est) meta.est = metadata.est;
+  if (metadata.due) meta.due = metadata.due;
+  if (metadata.plan) meta.plan = metadata.plan;
+  if (metadata.bucket) meta.bucket = metadata.bucket;
+  if (metadata.area) meta.area = metadata.area;
+  if (metadata.tags && metadata.tags.length > 0) meta.tags = metadata.tags.join(',');
+  if (metadata.created) meta.created = metadata.created;
 
-  if (metadata.energy) {
-    metaParts.push(`energy:${metadata.energy}`);
+  const ordered: Record<string, string> = {};
+  ordered.id = metadata.id;
+  for (const key of Object.keys(meta).filter((k) => k !== 'id').sort()) {
+    const value = meta[key];
+    if (value) {
+      ordered[key] = value;
+    }
   }
-  if (metadata.est) {
-    metaParts.push(`est:${metadata.est}`);
-  }
-  if (metadata.due) {
-    metaParts.push(`due:${metadata.due}`);
-  }
-  if (metadata.plan) {
-    metaParts.push(`plan:${metadata.plan}`);
-  }
-  if (metadata.bucket) {
-    metaParts.push(`bucket:${metadata.bucket}`);
-  }
-  if (metadata.area) {
-    metaParts.push(`area:${metadata.area}`);
-  }
-  if (metadata.tags && metadata.tags.length > 0) {
-    metaParts.push(`tags:${metadata.tags.join(',')}`);
-  }
-  if (metadata.created) {
-    metaParts.push(`created:${metadata.created}`);
-  }
-
-  const metaBlock = `[${metaParts.join(' ')}]`;
+  const parts = Object.entries(ordered).map(([k, v]) => `${k}:${v}`);
+  const metaBlock = `[${parts.join(' ')}]`;
   return `${indent}- [ ] ${text} ${metaBlock}`;
 }
 

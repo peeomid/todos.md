@@ -64,18 +64,19 @@ Rough layout:
 ┌────────────────────────── tmd – Today (bucket:today) ──────────────────────────┐
 [1] Today [2] Upcoming [3] Anytime [4] Someday [5] Projects [/] Search 
 ├────────────────────────────── Task List ─────────────────────────────────────┤
-│ [ ] A  Draft welcome email               as-onb:1   plan:2025-12-18   60m   │
-│ [x] N  Call bank about card              life:2     plan:2025-12-18   15m   │
-│ [ ] N  Refactor onboarding flow          as-onb:2   bucket:upcoming         │
-│ [ ] L  Small copy tweak                  as-onb:3   bucket:anytime          │
+│ as-onb — Autosenso Onboarding (2 tasks)                                      │
+│ [ ] (A) !  Draft welcome email           as-onb:1   plan:2025-12-18   60m    │
+│ [ ] (B) >  Refactor onboarding flow      as-onb:2   bucket:upcoming          │
+│ life — Life Admin (1 task)                                                   │
+│ [x] (B) ~  Call bank about card          life:2     plan:2025-12-18   15m    │
 │                                                                              │
-│ View: Today (1)  |  Query: status:open bucket:today  |  Flags: hide-done  ? │
+│ View: Today (1)  |  Query: status:open bucket:today  |  Flags: hide-done    │
 ├──────────────────────────── Details / Help ──────────────────────────────────┤
 │ Draft welcome email                                                         │
 │ project: as-onb   area: sidebiz   bucket: today   priority: high            │
 │ energy: normal   plan: 2025-12-18   due: -   est: 60m                       │
 │ file: projects/autosenso.md:23                                              │
-│                                                                              │
+│──────────────────────────────────────────────────────────────────────────────│
 │ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [/] search   │
 │ [n] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [q] quit       │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -86,6 +87,8 @@ Rough layout:
 Use a small, meaningful color palette:
 
 * **Selected row**: highlighted (reverse video or accent background).
+* **Active view tab**: distinct background color in the header tabs row.
+* **Project header rows**: bold + accent color, with the count dimmed.
 * **Status**:
 
  * Done tasks: dim/faded (e.g. same color but “dim” attribute).
@@ -94,9 +97,17 @@ Use a small, meaningful color palette:
  * `priority:high` – accent color (e.g. bright red/yellow).
  * `priority:normal` – default color.
  * `priority:low` – grey/faint.
+* **Bucket / priority shorthands (in task rows)**:
+
+ * Priority (first token after checkbox): `(A)` high, `(B)` normal, `(C)` low
+ * Bucket (next token, after optional priority): `!` today, `>` upcoming, `~` anytime, `?` someday
+* **Task text vs metadata**:
+
+ * Task text: normal/bright.
+ * Metadata (IDs, dates, estimates): dim by default; highlight key dates (e.g. `plan:`/`due:`) with an accent.
 * **Bucket** (in details or small tag in list):
 
- * `today` – accent (e.g. cyan).
+ * `today` – accent (e.g. cyan) and the bucket shorthand (`!`) should be clearly visible.
  * `upcoming` – another accent (e.g. blue).
  * `someday` – dim.
 
@@ -167,6 +178,11 @@ Built-ins (v1):
  * Shows a list of projects, not tasks.
  * Selecting a project opens a project-specific task list (like `status:open project:<id>`).
 
+Rendering rule (v1):
+* All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are **grouped by project** with a header row:
+  * `projectId — project name (count task(s))`
+  * Headers are visual only (not collapsible/selectable).
+
 ### 3.2. Custom views (config)
 
 In `tmd` config (e.g. YAML):
@@ -200,7 +216,7 @@ Custom views are part of the view cycle (`h/l` / left/right).
 ### 4.1. Global navigation
 
 * `q` – quit interactive mode.
-* `?` – show help/cheatsheet.
+Help is always displayed at the bottom (below the details panel).
 * `r` – refresh (re-read `todos.json` without restarting; optional v2).
 * `0–9` – jump to specific view (0 = All, 1 = Today, etc.).
 * `h` / `←` – previous view.
@@ -226,7 +242,7 @@ Custom views are part of the view cycle (`h/l` / left/right).
 Behavior:
 
 * A search bar appears at bottom.
-* Input is **pre-filled** with the view’s base query.
+* Input is **pre-filled** with the current query for the view, plus a trailing space (so you can type immediately).
 * On every keypress, the task list is re-filtered.
 
 Example in Today view:
@@ -239,6 +255,7 @@ You can:
 
 * Add text filter: `text:stripe`
 * Add more filters: `priority:high`, `area:work`, etc.
+* Or just type plain words (e.g. `stripe invoice`) which behave like `text:` filters.
 
 Resulting query used:
 
@@ -261,10 +278,14 @@ Search (scope: global): text:stripe priority:high _
 
 ### 5.3. Exiting search
 
+* `Enter`:
+ * Apply the current search input as the active query.
+ * Leave search mode and return to the list for navigation.
+
 * `Esc` or `Ctrl+C`:
 
  * Leave search mode.
- * Restore task list to base view query (no extra filters).
+ * Cancel the in-progress search edits (keep the previously active query).
  * Hide search bar.
 
 ### 5.4. Query display
@@ -325,6 +346,16 @@ Behavior:
 * Switch `[ ]` ↔ `[x]`.
 * Update `status` in index (`open`/`done`).
 * Respect `show_done` flag (task may disappear if hiding done).
+
+### 7.1b. Delete task
+
+* Key: `x`
+
+Behavior:
+
+* Confirm before deleting.
+* Deletes the selected task and any subtasks (indented subtree).
+* Writes changes back to Markdown and refreshes the in-memory list.
 
 ### 7.2. Priority mini menu
 
@@ -425,23 +456,16 @@ Effects:
 
 * Key: `e`
 
-Two possible behaviors (implementation choice):
+Behavior (v1):
 
-1. **Inline mini editor (v1 simple)**:
+1. `e` first shows a small chooser:
+   - `[t]` edit text
+   - `[m]` edit metadata
+2. The chosen editor opens:
+   - Text editor: edits the task description only.
+   - Metadata editor: edits the metadata block only (must be empty or a `[key:value ...]` block).
 
- * Popup shows two fields:
-
- * Task text (single line or wrapped).
- * Metadata block `[key:value ...]`.
- * User edits and saves.
- * TUI rewrites that line in Markdown.
-
-2. **External editor (advanced option)**:
-
- * `e` opens the task’s file in `$EDITOR` at that line.
- * On editor exit, re-parse that file and update in-memory task(s).
-
-V1 can implement 1; 2 can be optional later.
+Later (optional): support `$EDITOR` integration.
 
 ---
 

@@ -187,3 +187,30 @@ Default sort within bucket views:
 - `lint-rules.md` — documented the relaxed behavior.
 
 ---
+
+## 2025-12-19: TUI Task List Grouping + Stronger Color Guidance
+
+### Overview
+- All task lists in `tmd interactive` are grouped by project with a visual header row: `projectId — project name (count)`.
+- Color guidance is tightened to clearly distinguish task text vs metadata (IDs/dates/estimates), while keeping done tasks dim.
+- Help display is always-on at the bottom, shown below task details.
+
+### Files Updated
+- `tui_specs.md` — updated the layout example and color usage section
+
+---
+
+## 2025-12-19: TUI Search Apply/Cancel + Delete Action + TUI Architecture Doc
+
+### Overview
+- Search behavior clarified and implemented: `/` prefills with a trailing space, plain words behave like `text:` filters, `Enter` applies the query and returns to the list, and `Esc` cancels search edits.
+- Added a delete action (`x`) with confirmation that removes the selected task and its indented subtree.
+- Added a dedicated technical architecture document for the TUI.
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui.md`
+- `tui-architecture.md`
+
+---
