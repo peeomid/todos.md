@@ -251,3 +251,17 @@ Default sort within bucket views:
 - `tui_specs.md`
 - `tui_implementation_details.md`
 - `tui.md`
+
+---
+
+## 2025-12-19: TUI Add Project Flow — Use Current File + Clearer Key Menu Guidance
+
+### Overview
+- Add-project no longer asks the user to pick a project file: it writes to the current context file (selected project’s file, else selected task’s file, else first configured input file).
+- Add-project no longer prompts for heading level: it auto-picks `#` vs `##` based on the destination file.
+- Key menus now show an explicit footer hint indicating selection keys (e.g. `[1-9] choose`, `[h/n/l] choose`) to reduce first-run confusion.
+
+### Files Updated
+- `tui_specs.md`
+- `src/tui/interactive.ts`
+- `src/tui/prompts.ts`

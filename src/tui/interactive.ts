@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import terminalKit from 'terminal-kit';
 import type { Config } from '../config/loader.js';
 import { buildIndex } from '../indexer/index.js';
@@ -186,6 +187,93 @@ function truncateByWidth(s: string, maxWidth: number): string {
   if (maxWidth <= 0) return '';
   if (terminalKit.stringWidth(s) <= maxWidth) return s;
   return terminalKit.truncateString(s, maxWidth);
+}
+
+function joinHelpChunks(chunks: string[], width: number): string {
+  if (width <= 0) return '';
+  const sep = '  ';
+  let out = '';
+  let used = 0;
+
+  for (const chunk of chunks) {
+    const next = out ? `${out}${sep}${chunk}` : chunk;
+    if (terminalKit.stringWidth(next) <= width) {
+      out = next;
+      used++;
+      continue;
+    }
+    break;
+  }
+
+  if (!out) {
+    const first = chunks[0] ?? '';
+    return truncateByWidth(first, width);
+  }
+
+  if (used < chunks.length) {
+    const dots = `${sep}…`;
+    if (terminalKit.stringWidth(out + dots) <= width) out += dots;
+    else if (terminalKit.stringWidth(out + '…') <= width) out += '…';
+  }
+
+  return truncateByWidth(out, width);
+}
+
+function getFooterHelpLines(
+  state: SessionState,
+  view: InteractiveView,
+  isProjectsList: boolean,
+  width: number
+): { line1: string; line2: string } {
+  const globalFull = [
+    '[j/k/↑/↓] move',
+    '[g/G] top/bot',
+    '[h/l/←/→] views',
+    '[/] search',
+    '[z] show/hide done',
+    '[?] help',
+    '[q] quit',
+  ];
+  const globalCompact = ['[?] help', '[/] search', '[q] quit'];
+
+  const line1 = width < 60 ? joinHelpChunks(globalCompact, width) : joinHelpChunks(globalFull, width);
+
+  if (isProjectsList) {
+    const full = ['[Enter] open project', '[a] add project', '[?] help'];
+    const compact = ['[Enter] open', '[a] add', '[?] help'];
+    return { line1, line2: joinHelpChunks(width < 60 ? compact : full, width) };
+  }
+
+  if (view.kind === 'projects' && state.projects.drilldownProjectId) {
+    const full = [
+      '[Esc/Backspace] back',
+      '[space/x] done',
+      '[p] pri',
+      '[b] bucket',
+      '[n] plan',
+      '[d] due',
+      '[e] edit',
+      '[a] add task',
+      '[r] remove',
+      '[?] help',
+    ];
+    const compact = ['[Esc] back', '[space] done', '[e] edit', '[a] add', '[r] remove', '[?] help'];
+    return { line1, line2: joinHelpChunks(width < 80 ? compact : full, width) };
+  }
+
+  const tasksFull = [
+    '[space/x] done',
+    '[p] priority',
+    '[b] bucket',
+    '[n] plan',
+    '[d] due',
+    '[e] edit',
+    '[a] add',
+    '[r] remove',
+    '[?] help',
+  ];
+  const tasksCompact = ['[space] done', '[e] edit', '[a] add', '[r] remove', '[?] help'];
+  return { line1, line2: joinHelpChunks(width < 80 ? tasksCompact : tasksFull, width) };
 }
 
 function orderMetadata(metadata: Record<string, string>): Record<string, string> {
@@ -585,24 +673,19 @@ function render(state: SessionState, term: Term): void {
 
   // Help footer (always shown, below details)
   term.moveTo(1, footerTop + 5);
-  const help1 = '[j/k/↑/↓] move  [g/G] top/bot  [h/l/←/→] views  [/] search  [z] show/hide done  [q] quit';
-  style.dim(truncate(help1, width));
+  const help = getFooterHelpLines(state, view, isProjectsList, width);
+  style.dim(help.line1);
   term.moveTo(1, footerTop + 6);
-  const help2 = isProjectsList
-    ? '[Enter] open project  [a] add project  [?] shorthands'
-    : view.kind === 'projects' && state.projects.drilldownProjectId
-      ? '[Esc/Backspace] back  [space/x] done  [p] pri  [b] bucket  [n] plan  [d] due  [e] edit  [a] add task  [r] remove'
-      : '[space/x] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [r] remove  [?] shorthands';
-  style.dim(truncate(help2, width));
+  style.dim(help.line2);
 
   term.moveTo(1, footerTop + 7);
   if (state.message) {
-    style.red(truncate(state.message, width));
+    style.red(truncateByWidth(state.message, width));
   } else if (state.search.active) {
     const prompt = `Search (scope: ${state.search.scope}) [Enter apply, Esc cancel]: ${state.search.input}`;
-    style.cyan(truncate(prompt, width));
+    style.cyan(truncateByWidth(prompt, width));
   } else {
-    style.dim(truncate(state.busy ? 'Working…' : '', width));
+    style.dim(truncateByWidth(state.busy ? 'Working…' : '', width));
   }
 
   term.hideCursor();
@@ -1396,31 +1479,9 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    let filePath: string;
-    if (files.length <= 9) {
-      const lines = files.map((f, idx) => `[${idx + 1}] ${f}`);
-      const allowed = files.map((_, idx) => String(idx + 1));
-      const chosen = await showKeyMenu(
-        term,
-        'Add project → choose file',
-        [...lines, '', '[Enter] default (1)'],
-        allowed,
-        state.colorsDisabled,
-        { enter: '1' }
-      );
-      if (!chosen) return;
-      filePath = files[Number.parseInt(chosen, 10) - 1] ?? files[0]!;
-    } else {
-      const input = await promptText(
-        term,
-        'Add project → choose file',
-        'File path:',
-        files[0] ?? '',
-        state.colorsDisabled
-      );
-      if (input === null) return;
-      filePath = input.trim();
-    }
+    const selectedProject = getSelectedProject(state);
+    const selectedTask = getSelectedTask(state);
+    const filePath = selectedProject?.filePath ?? selectedTask?.filePath ?? files[0]!;
 
     if (!filePath) return;
     if (!fs.existsSync(filePath)) {
@@ -1428,19 +1489,10 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    const suggestedLevel = defaultProjectHeadingLevelForFile(filePath);
-    const levelChoice = await showKeyMenu(
-      term,
-      'Add project → heading level',
-      ['[1] # (top-level)', '[2] ## (nested)', '', `[Enter] default (${suggestedLevel === 2 ? '##' : '#'})`],
-      ['1', '2'],
-      state.colorsDisabled,
-      { enter: suggestedLevel === 2 ? '2' : '1' }
-    );
-    if (!levelChoice) return;
-    const headingLevel = levelChoice === '2' ? 2 : 1;
+    const headingLevel = defaultProjectHeadingLevelForFile(filePath);
 
-    const nameInput = await promptText(term, 'Add project', 'Project name:', '', state.colorsDisabled);
+    const title = `Add project → ${path.basename(filePath)}`;
+    const nameInput = await promptText(term, title, 'Project name:', '', state.colorsDisabled);
     if (nameInput === null) return;
     const name = nameInput.trim();
     if (!name) {
@@ -1451,7 +1503,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const suggestedId = slugifyProjectId(name);
     const idInput = await promptText(
       term,
-      'Add project',
+      title,
       'Project id (slug):',
       suggestedId,
       state.colorsDisabled
@@ -1467,7 +1519,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    const areaInput = await promptText(term, 'Add project', 'Area (optional):', '', state.colorsDisabled);
+    const areaInput = await promptText(term, title, 'Area (optional):', '', state.colorsDisabled);
     if (areaInput === null) return;
     const area = areaInput.trim() || undefined;
 
@@ -1491,7 +1543,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     state.query = getEffectiveQuery(state);
     state.selection = { row: 0, scroll: 0, selectedId: null };
     recompute(state);
-    state.message = `Created project ${projectId}`;
+    state.message = `Created project ${projectId} in ${path.basename(filePath)}`;
   }
 
   function findNeighborTaskIdForDeletion(): string | null {
@@ -1703,7 +1755,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       try {
         await showKeyMenu(
           term,
-          'Shorthand help',
+          'Help',
           getShorthandHelpLines(),
           [],
           state.colorsDisabled,

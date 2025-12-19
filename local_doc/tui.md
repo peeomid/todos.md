@@ -23,6 +23,7 @@
 - Row shorthands: task rows show the todo-format shorthands (priority `(A)/(B)/(C)` and bucket `!/>/~/?`) so users can learn them
 - Header emphasis: the active query is highlighted in the header line
 - Safety: external edit detection via file `mtime` prompts before writing
+- Small screens: footer help auto-condenses (shows the most important keys and an ellipsis), and `?` opens a scrollable help overlay with keybindings + shorthands
 
 ## Changelog
 

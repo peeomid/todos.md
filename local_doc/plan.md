@@ -118,6 +118,8 @@ Recent spec changes implemented:
 - [x] TUI: active view tab highlighted in header
 - [x] TUI: double-`Ctrl+C` quits (first press shows a prompt)
 - [x] TUI: in Projects view, `[a]` adds a new project and auto-switches into that project’s drilldown view
+- [x] TUI: add-project flow uses current file (no file picker), auto heading level, and starts at project name prompt
+- [x] TUI: key menus show an explicit “press key to choose” hint in the footer (e.g. `[1-9] choose`, `[h/n/l] choose`)
 - [x] `tmd interactive`: allow selecting input/output via flags (`--file/--input`, `--output/--out`)
 
 ## Next Steps

@@ -181,6 +181,16 @@ Built-ins (v1):
  * Shows a list of projects, not tasks.
  * Selecting a project opens a project-specific task list (like `status:open project:<id>`).
  * `[a]` adds a new project and immediately switches into that project’s drilldown view.
+ * Add-project flow guidance (v1):
+   - No file picker. The project is added to the “current file”:
+     - If a project row is selected, use that project’s `filePath`.
+     - Otherwise, use the selected task’s `filePath` (if any).
+     - Otherwise, use the first configured input file.
+   - No heading-level prompt. Heading level is auto-chosen (`#` vs `##`) based on the destination file’s existing structure.
+   - First prompt is always the name: `Project name: _` (Enter saves, Esc cancels).
+   - Follow-ups:
+     - `Project id (slug):` (pre-filled; Enter accepts)
+     - `Area (optional):`
 
 Rendering rule (v1):
 * All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are **grouped by project** with a header row:

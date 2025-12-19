@@ -1,4 +1,5 @@
 import { setCursorVisible } from './term-cursor.js';
+import terminalKit from 'terminal-kit';
 
 type Term = any;
 
@@ -22,18 +23,76 @@ export async function showKeyMenu(
   colorsDisabled: boolean,
   options?: { enter?: string }
 ): Promise<string | null> {
-  term.clear();
-  term.moveTo(1, 1);
-  boldOrPlain(term, colorsDisabled)(title);
-  for (let i = 0; i < lines.length; i++) {
-    term.moveTo(1, 3 + i);
-    term(lines[i]!);
+  let scrollTop = 0;
+
+  function formatChoiceHint(): string | null {
+    const uniq = Array.from(new Set(allowed));
+    if (uniq.length === 0) return null;
+
+    const allSingleChar = uniq.every((k) => k.length === 1);
+    if (!allSingleChar) return null;
+
+    const isDigit = uniq.every((k) => k >= '0' && k <= '9');
+    if (isDigit) {
+      const nums = uniq
+        .map((k) => Number.parseInt(k, 10))
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b);
+      if (nums.length !== uniq.length) return null;
+
+      let contiguous = true;
+      for (let i = 1; i < nums.length; i++) {
+        if (nums[i] !== nums[i - 1]! + 1) {
+          contiguous = false;
+          break;
+        }
+      }
+      if (contiguous && nums.length >= 3) return `[${nums[0]}-${nums[nums.length - 1]}] choose`;
+      return `[${nums.join('/')}] choose`;
+    }
+
+    const isLetter = uniq.every((k) => k >= 'a' && k <= 'z');
+    if (isLetter) return `[${uniq.join('/')}] choose`;
+
+    return null;
   }
-  term.moveTo(1, 3 + lines.length + 1);
-  dimOrPlain(term, colorsDisabled)('[Esc] cancel');
+
+  const render = (): void => {
+    const width: number = term.width ?? process.stdout.columns ?? 80;
+    const height: number = term.height ?? process.stdout.rows ?? 24;
+    const contentTop = 3;
+    const contentMaxRows = Math.max(1, height - contentTop - 2);
+    const maxScrollTop = Math.max(0, lines.length - contentMaxRows);
+    scrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
+
+    term.clear();
+    term.moveTo(1, 1);
+    boldOrPlain(term, colorsDisabled)(terminalKit.truncateString(title, width));
+
+    const shown = lines.slice(scrollTop, scrollTop + contentMaxRows);
+    for (let i = 0; i < shown.length; i++) {
+      term.moveTo(1, contentTop + i);
+      term(terminalKit.truncateString(shown[i] ?? '', width));
+    }
+
+    const footerParts: string[] = [];
+    if (lines.length > contentMaxRows) footerParts.push('[↑/↓] scroll');
+    const choiceHint = formatChoiceHint();
+    if (choiceHint) footerParts.push(choiceHint);
+    footerParts.push('[Esc] cancel');
+    term.moveTo(1, contentTop + contentMaxRows + 1);
+    dimOrPlain(term, colorsDisabled)(terminalKit.truncateString(footerParts.join('  '), width));
+  };
+
+  render();
 
   return await new Promise<string | null>((resolve) => {
     const handler = (name: string) => {
+      const height: number = term.height ?? process.stdout.rows ?? 24;
+      const contentTop = 3;
+      const contentMaxRows = Math.max(1, height - contentTop - 2);
+      const maxScrollTop = Math.max(0, lines.length - contentMaxRows);
+
       if (name === 'ESCAPE' || name === 'CTRL_C') {
         term.removeListener('key', handler);
         resolve(null);
@@ -42,6 +101,36 @@ export async function showKeyMenu(
       if (name === 'ENTER' && options?.enter !== undefined) {
         term.removeListener('key', handler);
         resolve(options.enter);
+        return;
+      }
+      if (name === 'UP' && scrollTop > 0) {
+        scrollTop = Math.max(0, scrollTop - 1);
+        render();
+        return;
+      }
+      if (name === 'DOWN' && scrollTop < maxScrollTop) {
+        scrollTop = Math.min(maxScrollTop, scrollTop + 1);
+        render();
+        return;
+      }
+      if (name === 'PAGE_UP' && scrollTop > 0) {
+        scrollTop = Math.max(0, scrollTop - Math.max(1, Math.floor(contentMaxRows / 2)));
+        render();
+        return;
+      }
+      if (name === 'PAGE_DOWN' && scrollTop < maxScrollTop) {
+        scrollTop = Math.min(maxScrollTop, scrollTop + Math.max(1, Math.floor(contentMaxRows / 2)));
+        render();
+        return;
+      }
+      if (name === 'HOME' && scrollTop !== 0) {
+        scrollTop = 0;
+        render();
+        return;
+      }
+      if (name === 'END' && scrollTop !== maxScrollTop) {
+        scrollTop = maxScrollTop;
+        render();
         return;
       }
       const lower = name.toLowerCase();
