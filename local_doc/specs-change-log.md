@@ -214,3 +214,15 @@ Default sort within bucket views:
 - `tui-architecture.md`
 
 ---
+
+## 2025-12-19: TUI Shorthand Help Overlay (`?`)
+
+### Overview
+- Added a dedicated shorthand help overlay (`?`) so users can quickly learn the row shorthands shown in the task list (priority `(A)/(B)/(C)` and bucket `!/>/~/?`).
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui-architecture.md`
+
+---

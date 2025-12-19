@@ -87,6 +87,7 @@ Global:
 - `h/l` or `←/→` previous/next view
 - `z` show/hide done (query rewrite)
 - `/` enter live search (prefilled with current query + a trailing space)
+- `?` shorthand help (priority/bucket)
 - in search: type filters or plain words (plain words are treated as `text:` filters)
 - in search: `Enter` applies and returns to list; `Esc`/`Ctrl+C` cancels; `!`/`Ctrl+/` toggles scope; `z` toggles status mode
 

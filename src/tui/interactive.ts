@@ -32,6 +32,7 @@ import { confirmYesNo, pickProjectTypeahead, promptText, showKeyMenu } from './p
 import { setCursorVisible } from './term-cursor.js';
 import { runEditFlow } from './edit-flow.js';
 import { decideAddTargetProjectId } from './add-target.js';
+import { getShorthandHelpLines } from './shorthand-help.js';
 
 type Term = any;
 
@@ -575,7 +576,7 @@ function render(state: SessionState, term: Term): void {
   style.dim(truncate(help1, width));
   term.moveTo(1, footerTop + 6);
   const help2 =
-    '[space] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [x] delete  [Enter] project';
+    '[space] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [x] delete  [?] shorthands';
   style.dim(truncate(help2, width));
 
   term.moveTo(1, footerTop + 7);
@@ -1484,6 +1485,27 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       state.search.scope = 'view';
       state.search.input = ensureTrailingSpace(state.query);
       render(state, term);
+      return;
+    }
+
+    // Shorthand help
+    if (name === '?') {
+      state.busy = true;
+      render(state, term);
+      try {
+        await showKeyMenu(
+          term,
+          'Shorthand help',
+          getShorthandHelpLines(),
+          [],
+          state.colorsDisabled,
+          { enter: '' }
+        );
+      } finally {
+        state.busy = false;
+        recompute(state);
+        render(state, term);
+      }
       return;
     }
 

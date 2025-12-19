@@ -111,6 +111,7 @@ Search:
 - `Enter` apply search to `query` and return to list
 - `Esc`/`Ctrl+C` cancel
 - `!`/`Ctrl+/` toggle view vs global scope
+- `?` show shorthand help overlay
 
 Task actions:
 - `space` toggle done (done cascades; undone does not)

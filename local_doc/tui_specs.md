@@ -221,6 +221,7 @@ Help is always displayed at the bottom (below the details panel).
 * `0–9` – jump to specific view (0 = All, 1 = Today, etc.).
 * `h` / `←` – previous view.
 * `l` / `→` – next view.
+* `?` – show shorthand help (priority/bucket shorthands displayed in task rows).
 
 ### 4.2. Task list navigation (vim style + arrows)
 

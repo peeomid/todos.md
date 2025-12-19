@@ -108,6 +108,7 @@ Recent spec changes implemented:
 - [x] Search UX: `/` prefill includes trailing space; plain words behave like `text:`; `Enter` applies query; `Esc` cancels
 - [x] Task actions: toggle done (with cascade), priority/bucket/plan/due menus, inline edit, add flow
 - [x] Task delete: `x` with confirmation (deletes indented subtree)
+- [x] Shorthand help: `?` shows priority/bucket shorthand reference
 - [x] External edit protection via `mtime` prompt before writes
 - [x] Exit behavior: reindex and run `sync` once (if views are configured)
 - [x] TUI: group all task lists by project with header rows (`projectId — project name (N task(s))`)
