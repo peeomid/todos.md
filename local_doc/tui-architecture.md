@@ -86,7 +86,7 @@ Edits are “locate then mutate”:
 
 TUI delete is implemented as:
 
-- `x` keybinding in the task list (not in the Projects list).
+- `r` keybinding in the task list (not in the Projects list).
 - Confirmation prompt (yes/no) before deleting.
 - Deletion removes the selected task plus its indented subtree from the Markdown file.
 
@@ -115,7 +115,8 @@ Search:
 
 Task actions:
 - `space` toggle done (done cascades; undone does not)
-- `x` delete (with confirmation; deletes subtree)
+- `x` toggle done (alias for `space`)
+- `r` delete (with confirmation; deletes subtree)
 - `p/b/n/d/e/a` (priority/bucket/plan/due/edit/add)
 
 Add destination:

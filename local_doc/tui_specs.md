@@ -350,7 +350,7 @@ Behavior:
 
 ### 7.1b. Delete task
 
-* Key: `x`
+* Key: `r`
 
 Behavior:
 

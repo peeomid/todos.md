@@ -107,7 +107,7 @@ Recent spec changes implemented:
 - [x] Live search (`/`) with scope toggle, and `z` show/hide done query rewrite
 - [x] Search UX: `/` prefill includes trailing space; plain words behave like `text:`; `Enter` applies query; `Esc` cancels
 - [x] Task actions: toggle done (with cascade), priority/bucket/plan/due menus, inline edit, add flow
-- [x] Task delete: `x` with confirmation (deletes indented subtree)
+- [x] Task delete: `r` with confirmation (deletes indented subtree)
 - [x] Shorthand help: `?` shows priority/bucket shorthand reference
 - [x] External edit protection via `mtime` prompt before writes
 - [x] Exit behavior: reindex and run `sync` once (if views are configured)

@@ -41,3 +41,4 @@
 - Added footer separator line between details and help in the TUI (2025-12-19)
 - Improved TUI search UX (apply/cancel, trailing space, free-text) and added delete-with-confirmation + TUI architecture doc (2025-12-19)
 - Added `?` shorthand help overlay in the TUI (priority/bucket shorthands) (2025-12-19)
+- Changed TUI delete keybinding to `r` and made `x` an alias for toggle done (2025-12-19)

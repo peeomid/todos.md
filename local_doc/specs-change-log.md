@@ -226,3 +226,16 @@ Default sort within bucket views:
 - `tui-architecture.md`
 
 ---
+
+## 2025-12-19: TUI Keybindings — `r` Remove and `x` Toggle Done
+
+### Overview
+- Changed the delete keybinding from `x` to `r` (remove) to reduce accidental deletes.
+- `x` is now an alias for toggle done (same as `space`).
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui-architecture.md`
+
+---

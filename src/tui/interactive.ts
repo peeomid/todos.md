@@ -576,7 +576,7 @@ function render(state: SessionState, term: Term): void {
   style.dim(truncate(help1, width));
   term.moveTo(1, footerTop + 6);
   const help2 =
-    '[space] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [x] delete  [?] shorthands';
+    '[space/x] toggle done  [p] priority  [b] bucket  [n] plan  [d] due  [e] edit (t/m)  [a] add (Tab project)  [r] remove  [?] shorthands';
   style.dim(truncate(help2, width));
 
   term.moveTo(1, footerTop + 7);
@@ -1644,7 +1644,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     // Task actions (tasks mode only)
     if (!isProjectsList) {
-      if (isSpaceKeyName(name)) {
+      if (isSpaceKeyName(name) || name === 'x') {
         state.busy = true;
         render(state, term);
         try {
@@ -1656,7 +1656,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         }
         return;
       }
-      if (name === 'x') {
+      if (name === 'r') {
         state.busy = true;
         render(state, term);
         try {

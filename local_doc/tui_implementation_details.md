@@ -99,7 +99,8 @@ Movement:
 
 Task actions:
 - `space` toggle done (done cascades to all descendants; undone does not cascade)
-- `x` delete task (with confirmation; deletes subtasks too)
+- `x` toggle done (alias for `space`)
+- `r` delete task (with confirmation; deletes subtasks too)
 - `p` priority menu (h/n/l/c) — shorthands: `h` high, `n` normal, `l` low
 - `b` bucket menu (t/u/a/s/c) — shorthands: `t` today, `u` upcoming, `a` anytime, `s` someday
   - plus rule: if bucket becomes `today` and `plan` is empty, set `plan` to today
