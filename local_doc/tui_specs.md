@@ -292,7 +292,77 @@ Prompt example:
 Search (scope: global): text:stripe priority:high _
 ```
 
-### 5.3. Exiting search
+### 5.3. Autocomplete for filter keys and values
+
+While typing in search mode, the TUI provides inline autocomplete suggestions for filter keys and values.
+
+#### 5.3.1. Autocomplete trigger
+
+* Autocomplete activates automatically as you type.
+* When typing a partial filter key (e.g., `bu`), suggestions appear for matching keys (e.g., `bucket:`).
+* After typing a colon (e.g., `bucket:`), suggestions appear for valid values (e.g., `today`, `upcoming`, `anytime`, `someday`).
+
+#### 5.3.2. Autocomplete navigation
+
+* `Tab` – accept the currently selected suggestion.
+* `↑` – select previous suggestion.
+* `↓` – select next suggestion.
+* Continue typing – filters suggestions to match typed text.
+* `Esc` – cancel autocomplete (or exit search if no autocomplete active).
+
+#### 5.3.3. Filter key suggestions
+
+Available filter keys:
+* `status:` – Task completion status (open, done, all)
+* `bucket:` – Planning bucket (today, upcoming, anytime, someday)
+* `energy:` – Energy level (high, normal, low)
+* `priority:` – Priority level (high, normal, low)
+* `project:` – Project ID (dynamic, from task index)
+* `area:` – Area name (dynamic, from task index)
+* `due:` – Due date (YYYY-MM-DD, today, tomorrow)
+* `plan:` – Planned date (YYYY-MM-DD, today, tomorrow)
+* `tags:` – Tag name (dynamic, from task index)
+* `parent:` – Parent task ID (dynamic, from task index)
+* `top-level:` – Show only top-level tasks (true)
+* `overdue:` – Show only overdue tasks (true)
+* `text:` – Full-text search (freeform)
+
+#### 5.3.4. Filter value suggestions
+
+Value suggestions depend on the filter key:
+
+* **Static values** (`status`, `bucket`, `energy`, `priority`): Fixed list of valid values.
+* **Dynamic values** (`project`, `area`, `tags`, `parent`): Extracted from the task index; suggestions update as the index changes.
+* **Date values** (`due`, `plan`): Shortcuts like `today`, `tomorrow`, plus `YYYY-MM-DD` format hint.
+* **Boolean values** (`overdue`, `top-level`): Only `true` is valid.
+
+#### 5.3.5. Rendering
+
+Suggestions appear in an inline panel below the search prompt:
+
+```text
+Search (scope: view): bu█
+────────────────────────
+▶ bucket:        Planning bucket
+  …
+```
+
+After typing `bucket:`:
+
+```text
+Search (scope: view): bucket:█
+────────────────────────
+▶ today          Today's focus
+  upcoming       Next up
+  anytime        Flexible timing
+  someday        Future ideas
+```
+
+* Selected suggestion is highlighted (reverse video or accent background).
+* Up to 4 suggestions shown at once (truncated with `...` if more available).
+* Suggestions disappear if no matches found.
+
+### 5.4. Exiting search
 
 * `Enter`:
  * Apply the current search input as the active query.
@@ -304,7 +374,7 @@ Search (scope: global): text:stripe priority:high _
  * Cancel the in-progress search edits (keep the previously active query).
  * Hide search bar.
 
-### 5.4. Query display
+### 5.5. Query display
 
 The top bar’s “Query” section shows:
 
@@ -474,12 +544,21 @@ Effects:
 
 Behavior (v1):
 
-1. `e` first shows a small chooser:
-   - `[t]` edit text
-   - `[m]` edit metadata
-2. The chosen editor opens:
-   - Text editor: edits the task description only.
-   - Metadata editor: edits the metadata block only (must be empty or a `[key:value ...]` block).
+`e` opens a 2-field edit modal:
+
+- `Text` – task description
+- `Meta` – metadata *inner* content (the part inside `[ ... ]`, i.e. `key:value key:value`)
+
+Key rules (consistent with search-style autocomplete):
+
+- If a suggestion list is visible:
+  - `Tab` / `Enter` selects (applies) the highlighted suggestion
+  - `↑/↓` moves the highlighted suggestion
+- If no suggestion list is visible:
+  - `Tab` goes to the next field
+  - `Shift+Tab` goes to the previous field (best-effort; depends on terminal key mapping)
+  - `Enter` goes to the next field (or saves on the final field)
+  - `↑/↓` moves focus between fields
 
 Later (optional): support `$EDITOR` integration.
 
@@ -491,22 +570,32 @@ Later (optional): support `$EDITOR` integration.
 
 Project targeting (must be explicit to the user):
 
-* The add flow always shows the destination project in the header: `Add task → <projectId> — <project name>`.
+* The add UI always makes the destination project explicit (Project is a first-class field).
 * Default project selection (in order):
   1. If in Projects drilldown, add to that project.
   2. If the current list contains tasks from exactly one project, add to that project.
   3. Otherwise, default to the selected task’s project.
   4. Otherwise, fall back to Inbox (`interactive.defaultProject`, default `"inbox"`).
-* `Tab` opens a fast typeahead project picker to change the destination.
+* The Project field is prefilled by the rules above, but the modal always starts focused on Project so it’s easy to confirm/change.
 
 Flow:
 
-0. Choose destination project (defaulted per rules above; user can press `Tab` to change).
-1. Prompt: `Task text: _`
-2. Prompt: `Priority [h=high, n=normal, l=low, Enter=normal]:`
-3. Prompt: `Bucket [t=today, u=upcoming, a=anytime, s=someday, Enter=none]:`
-4. Prompt: `Plan date [YYYY-MM-DD or shortcuts, Enter=none]:`
-5. Prompt: `Due date [YYYY-MM-DD or shortcuts, Enter=none]:`
+`a` opens a 3-field add modal:
+
+1. `Project` (with typeahead suggestions)
+2. `Text`
+3. `Meta` (optional; autocomplete for common metadata keys/values)
+
+Key rules:
+
+- If a suggestion list is visible:
+  - `Tab` / `Enter` selects (applies) the highlighted suggestion
+  - `↑/↓` moves the highlighted suggestion
+- If no suggestion list is visible:
+  - `Tab` goes to the next field
+  - `Shift+Tab` goes to the previous field (best-effort; depends on terminal key mapping)
+  - `Enter` goes to the next field (or saves on the final field)
+  - `↑/↓` moves focus between fields
 
 Result:
 
@@ -514,7 +603,7 @@ Result:
 * Create metadata block with:
 
  * `id` (generated),
- * plus chosen `priority`, `bucket`, `plan`, `due`.
+ * plus any user-provided metadata (e.g. `priority`, `bucket`, `plan`, `due`, `energy`, `est`, `tags`, `area`).
 * Add task to in-memory list and show it in the current view if it matches.
 
 ---

@@ -265,3 +265,24 @@ Default sort within bucket views:
 - `tui_specs.md`
 - `src/tui/interactive.ts`
 - `src/tui/prompts.ts`
+
+---
+
+## 2025-12-20: TUI Search Autocomplete + Input Field Cursor Visibility
+
+### Overview
+- Fixed search autocomplete visibility and correctness:
+  - Autocomplete panel now reserves screen space while search is active (so it doesn't render off-screen).
+  - Accepting a filter-key suggestion no longer inserts a trailing space (so `bucket:` immediately triggers value suggestions).
+- Improved input UX across the TUI:
+  - Search, text prompts, and project picker now render a consistent bracketed input field with a clearly visible cursor.
+  - Input field styling uses a subtle dark background (better for iTerm/dark themes).
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `src/tui/interactive.ts`
+- `src/tui/autocomplete.ts`
+- `src/tui/layout.ts`
+- `src/tui/input-render.ts`
+- `src/tui/prompts.ts`

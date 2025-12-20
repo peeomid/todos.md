@@ -23,17 +23,26 @@ import { generateNextId, getExistingIdsForProject } from '../editor/id-generator
 import { insertTask, type TaskMetadata } from '../editor/task-inserter.js';
 import { isSpaceKeyName } from './key-utils.js';
 import { getStickyHeaderLabel } from './sticky-header.js';
+import { getFooterHeight } from './layout.js';
+import { renderLabeledInputField } from './input-render.js';
 import {
   formatBucketSymbolShorthand,
   formatBucketTagShorthand,
   formatPriorityShorthand,
   getTaskShorthandTokens,
 } from './task-shorthands.js';
-import { confirmYesNo, pickProjectTypeahead, promptText, showKeyMenu } from './prompts.js';
+import { confirmYesNo, promptAddTaskModal, promptEditTaskModal, promptText, showKeyMenu } from './prompts.js';
 import { setCursorVisible } from './term-cursor.js';
-import { runEditFlow } from './edit-flow.js';
 import { decideAddTargetProjectId } from './add-target.js';
 import { getShorthandHelpLines } from './shorthand-help.js';
+import { readCurrentMetadataBlockString } from './edit-flow.js';
+import {
+  getAutocompleteContext,
+  generateSuggestions,
+  applySuggestion,
+  type AutocompleteState,
+} from './autocomplete.js';
+import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
 
 type Term = any;
 
@@ -59,7 +68,12 @@ interface SessionState {
   viewIndex: number;
   statusMode: 'open' | 'all';
   query: string;
-  search: { active: boolean; scope: 'view' | 'global'; input: string };
+  search: {
+    active: boolean;
+    scope: 'view' | 'global';
+    input: string;
+    autocomplete: AutocompleteState;
+  };
   selection: { row: number; scroll: number; selectedId: string | null };
   projects: { drilldownProjectId: string | null };
   fileMtimes: Map<string, number>;
@@ -257,7 +271,7 @@ function getFooterHelpLines(
       '[r] remove',
       '[?] help',
     ];
-    const compact = ['[Esc] back', '[space] done', '[e] edit', '[a] add', '[r] remove', '[?] help'];
+    const compact = ['[Esc] back', '[space] done', '[e] edit', '[a] add', '[?] help'];
     return { line1, line2: joinHelpChunks(width < 80 ? compact : full, width) };
   }
 
@@ -272,7 +286,7 @@ function getFooterHelpLines(
     '[r] remove',
     '[?] help',
   ];
-  const tasksCompact = ['[space] done', '[e] edit', '[a] add', '[r] remove', '[?] help'];
+  const tasksCompact = ['[space] done', '[e] edit', '[a] add', '[?] help'];
   return { line1, line2: joinHelpChunks(width < 80 ? tasksCompact : tasksFull, width) };
 }
 
@@ -469,13 +483,14 @@ function render(state: SessionState, term: Term): void {
     style.dim('─'.repeat(width));
   }
 
-  // Footer uses:
+  const footerHeight = getFooterHeight({ searchActive: state.search.active });
+
+  // Footer uses (base):
   // - 1 separator line
   // - 3 details lines
   // - 1 separator line
   // - 2 help lines
   // - 1 status/message line
-  const footerHeight = 8;
   const listTop = 5;
   const listHeight = Math.max(1, height - listTop - footerHeight);
 
@@ -671,24 +686,61 @@ function render(state: SessionState, term: Term): void {
   term.moveTo(1, footerTop + 4);
   style.dim('─'.repeat(width));
 
-  // Help footer (always shown, below details)
-  term.moveTo(1, footerTop + 5);
-  const help = getFooterHelpLines(state, view, isProjectsList, width);
-  style.dim(help.line1);
-  term.moveTo(1, footerTop + 6);
-  style.dim(help.line2);
+  // Help footer (shown when not in autocomplete mode)
+  if (!state.search.active || !state.search.autocomplete.active) {
+    term.moveTo(1, footerTop + 5);
+    const help = getFooterHelpLines(state, view, isProjectsList, width);
+    style.dim(help.line1);
+    term.moveTo(1, footerTop + 6);
+    style.dim(help.line2);
+  } else {
+    // Clear help lines when showing autocomplete
+    term.moveTo(1, footerTop + 5);
+    term.eraseLineAfter();
+    term.moveTo(1, footerTop + 6);
+    term.eraseLineAfter();
+  }
 
+  // Search prompt/message line
   term.moveTo(1, footerTop + 7);
   if (state.message) {
     style.red(truncateByWidth(state.message, width));
   } else if (state.search.active) {
-    const prompt = `Search (scope: ${state.search.scope}) [Enter apply, Esc cancel]: ${state.search.input}`;
-    style.cyan(truncateByWidth(prompt, width));
+    const scopeLabel = state.search.scope === 'view' ? 'view' : 'global';
+    const label = `Search (${scopeLabel}) `;
+    term.eraseLineAfter();
+    const { cursorCol } = renderLabeledInputField(term, {
+      label,
+      value: state.search.input,
+      width,
+      colorsDisabled: state.colorsDisabled,
+      placeholder: 'type filters (e.g. bucket:today) …',
+    });
+    term.eraseLineAfter();
+
+    // Also show the real terminal cursor (some terminals/themes make painted cursors hard to see).
+    term.moveTo(cursorCol, footerTop + 7);
+    setCursorVisible(term, true);
   } else {
     style.dim(truncateByWidth(state.busy ? 'Working…' : '', width));
   }
 
-  term.hideCursor();
+  // Render autocomplete suggestions BELOW the search prompt
+  if (state.search.active && state.search.autocomplete.active) {
+    // Start rendering suggestions right below the search prompt
+    // This will occupy footerTop + 8 onwards (up to 6 more lines: border + 4 suggestions + hint)
+    renderAutocompleteSuggestionsBox(term, {
+      suggestions: state.search.autocomplete.suggestions,
+      selectedIndex: state.search.autocomplete.selectedIndex,
+      startRow: footerTop + 8,
+      width,
+      colorsDisabled: state.colorsDisabled,
+    });
+  }
+
+  if (!state.search.active) {
+    term.hideCursor();
+  }
 }
 
 function getEffectiveQuery(state: SessionState): string {
@@ -962,6 +1014,25 @@ function parseManualDateInput(input: string): string | null {
   return normalized;
 }
 
+/**
+ * Update autocomplete state based on current search input
+ */
+function updateAutocomplete(state: SessionState): void {
+  const input = state.search.input;
+  const cursorPos = input.length; // Simplified: cursor always at end
+  const allTasks = Object.values(state.index.tasks);
+
+  const context = getAutocompleteContext(input, cursorPos);
+  const suggestions = generateSuggestions(context, allTasks);
+
+  state.search.autocomplete = {
+    active: suggestions.length > 0,
+    suggestions,
+    selectedIndex: 0,
+    context,
+  };
+}
+
 export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex> {
   const term: Term = terminalKit.terminal;
 
@@ -971,7 +1042,17 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     viewIndex: 1, // default Today
     statusMode: 'open',
     query: '',
-    search: { active: false, scope: 'view', input: '' },
+    search: {
+      active: false,
+      scope: 'view',
+      input: '',
+      autocomplete: {
+        active: false,
+        suggestions: [],
+        selectedIndex: 0,
+        context: null,
+      },
+    },
     selection: { row: 0, scroll: 0, selectedId: null },
     projects: { drilldownProjectId: null },
     fileMtimes: getFileMtimes(options.index),
@@ -1131,8 +1212,8 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const choice = await showKeyMenu(
       term,
-      `Set priority for: ${selected.text}`,
-      ['[h] high', '[n] normal', '[l] low', '[c] clear'],
+      `Set priority — ${selected.globalId}`,
+      [`Task: ${selected.text}`, '', '[h] high', '[n] normal', '[l] low', '[c] clear'],
       ['h', 'n', 'l', 'c'],
       state.colorsDisabled
     );
@@ -1162,8 +1243,8 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const choice = await showKeyMenu(
       term,
-      `Set bucket for: ${selected.text}`,
-      ['[t] today', '[u] upcoming', '[a] anytime', '[s] someday', '[c] clear'],
+      `Set bucket — ${selected.globalId}`,
+      [`Task: ${selected.text}`, '', '[t] today', '[u] upcoming', '[a] anytime', '[s] someday', '[c] clear'],
       ['t', 'u', 'a', 's', 'c'],
       state.colorsDisabled
     );
@@ -1198,8 +1279,14 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const choice = await showKeyMenu(
       term,
-      `${which === 'plan' ? 'Plan date' : 'Due date'} for: ${selected.text}`,
-      ['[t] today', '[m] manual (YYYY-MM-DD or +Nd/+Nw)', '[c] clear'],
+      `Set ${which === 'plan' ? 'plan date' : 'due date'} — ${selected.globalId}`,
+      [
+        `Task: ${selected.text}`,
+        '',
+        '[t] today',
+        '[m] manual (YYYY-MM-DD or +Nd/+Nw)',
+        '[c] clear',
+      ],
       ['t', 'm', 'c'],
       state.colorsDisabled
     );
@@ -1219,8 +1306,8 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     } else if (choice === 'm') {
       const input = await promptText(
         term,
-        `${which === 'plan' ? 'Plan date' : 'Due date'} (manual)`,
-        'Input:',
+        `Set ${which === 'plan' ? 'plan date' : 'due date'} (manual) — ${selected.globalId}`,
+        'Date (YYYY-MM-DD or +Nd/+Nw):',
         task[which] ?? '',
         state.colorsDisabled
       );
@@ -1249,20 +1336,19 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const task = state.index.tasks[taskId];
     if (!task) return;
 
-    const result = await runEditFlow({
+    const currentMeta = readCurrentMetadataBlockString(task);
+    const result = await promptEditTaskModal({
       term,
-      task,
+      title: `Edit task — ${task.globalId}`,
+      taskLine: `Task: ${task.text}`,
+      initialText: task.text,
+      initialMetadata: currentMeta,
+      allTasks: Object.values(state.index.tasks),
       colorsDisabled: state.colorsDisabled,
-      showKeyMenu,
-      promptText,
     });
+    if (!result) return;
 
-    if (!result.ok) {
-      if ('error' in result) state.message = result.error;
-      return;
-    }
-
-    rewriteTaskTextAndMetadataInFile(task, result.text, result.metadataBlock);
+    rewriteTaskTextAndMetadataInFile(task, result.text.trim(), result.metadataBlock.trim());
     refreshFromDisk();
     state.selection.selectedId = taskId;
   }
@@ -1278,145 +1364,97 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       inboxProjectId,
     });
 
-    let targetProjectId = decision.projectId;
-    if (!targetProjectId) {
-      // No inferred project and no Inbox project exists; force explicit selection.
-      const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
-      const picked = await pickProjectTypeahead(
-        term,
-        'Choose project',
-        projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
-        '',
-        state.colorsDisabled
-      );
-      if (!picked) return;
-      targetProjectId = picked;
+    const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
+    if (projects.length === 0) {
+      state.message = 'No projects found';
+      return;
     }
 
-    // Always show destination and allow changing it via Tab before entering text.
-    while (true) {
-      const project = state.index.projects[targetProjectId];
-      if (!project) {
-        state.message = `Project '${targetProjectId}' not found. Re-run index.`;
-        return;
-      }
+    const initialProjectId = decision.projectId ?? null;
+    const picked = await promptAddTaskModal({
+      term,
+      title: 'Add task',
+      projects: projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
+      initialProjectId,
+      allTasks: Object.values(state.index.tasks),
+      colorsDisabled: state.colorsDisabled,
+    });
+    if (!picked) return;
 
-      term.clear();
-      term.moveTo(1, 1);
-      const title = `Add task → ${project.id} — ${project.name}`;
-      (state.colorsDisabled ? term : term.bold)(title);
-      term.moveTo(1, 3);
-      term('Press Enter to continue, Tab to change project, Esc to cancel');
-
-      const choice = await new Promise<'continue' | 'change' | 'cancel'>((resolve) => {
-        const handler = (name: string) => {
-          if (name === 'ESCAPE') {
-            term.removeListener('key', handler);
-            resolve('cancel');
-            return;
-          }
-          if (name === 'TAB') {
-            term.removeListener('key', handler);
-            resolve('change');
-            return;
-          }
-          if (name === 'ENTER') {
-            term.removeListener('key', handler);
-            resolve('continue');
-          }
-        };
-        term.on('key', handler);
-      });
-
-      if (choice === 'cancel') return;
-      if (choice === 'change') {
-        const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
-        const picked = await pickProjectTypeahead(
-          term,
-          'Choose project',
-          projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
-          project.id,
-          state.colorsDisabled
-        );
-        if (!picked) continue;
-        targetProjectId = picked;
-        continue;
-      }
-
-      break;
+    const targetProject = picked.projectId;
+    const proj = state.index.projects[targetProject];
+    if (!proj) {
+      state.message = `Project '${targetProject}' not found. Re-run index.`;
+      return;
     }
 
-    const targetProject = targetProjectId;
-
-    const res = await ensureFileFresh(term, state, state.index.projects[targetProject]!.filePath, refreshFromDisk);
+    const res = await ensureFileFresh(term, state, proj.filePath, refreshFromDisk);
     if (!res.ok) return;
 
-    const proj = state.index.projects[targetProject]!;
-    const text = await promptText(term, `Add task → ${proj.id} — ${proj.name}`, 'Task text:', '', state.colorsDisabled);
-    if (!text) return;
+    const { metadata: rawMeta } = parseMetadataBlock(picked.metadataInner ? `[${picked.metadataInner}]` : '');
 
-    const priorityKey = await showKeyMenu(
-      term,
-      'Priority',
-      ['[h] high', '[n] normal', '[l] low', '[Enter] normal'],
-      ['h', 'n', 'l'],
-      state.colorsDisabled,
-      { enter: '' }
-    );
-    const priority: Priority = priorityKey === 'h' ? 'high' : priorityKey === 'l' ? 'low' : 'normal';
+    const priorityRaw = rawMeta.priority;
+    const energyRaw = rawMeta.energy;
+    const bucketRaw = rawMeta.bucket;
+    const estRaw = rawMeta.est;
+    const areaRaw = rawMeta.area;
+    const tagsRaw = rawMeta.tags;
+    const planRaw = rawMeta.plan;
+    const dueRaw = rawMeta.due;
 
-    const bucketKey = await showKeyMenu(
-      term,
-      'Bucket',
-      ['[t] today', '[u] upcoming', '[a] anytime', '[s] someday', '[Enter] none'],
-      ['t', 'u', 'a', 's'],
-      state.colorsDisabled,
-      { enter: '' }
-    );
+    const priority: TaskMetadata['priority'] =
+      priorityRaw === 'high' || priorityRaw === 'normal' || priorityRaw === 'low' ? priorityRaw : undefined;
+    if (priorityRaw && !priority) {
+      state.message = `Invalid priority: ${priorityRaw}`;
+      return;
+    }
+
+    const energy: TaskMetadata['energy'] =
+      energyRaw === 'high' || energyRaw === 'normal' || energyRaw === 'low' ? energyRaw : undefined;
+    if (energyRaw && !energy) {
+      state.message = `Invalid energy: ${energyRaw}`;
+      return;
+    }
+
     const bucket =
-      bucketKey === 't'
-        ? 'today'
-        : bucketKey === 'u'
-          ? 'upcoming'
-          : bucketKey === 'a'
-            ? 'anytime'
-            : bucketKey === 's'
-              ? 'someday'
-              : undefined;
+      bucketRaw === 'today' || bucketRaw === 'upcoming' || bucketRaw === 'anytime' || bucketRaw === 'someday'
+        ? bucketRaw
+        : undefined;
+    if (bucketRaw && !bucket) {
+      state.message = `Invalid bucket: ${bucketRaw}`;
+      return;
+    }
 
-    const planInput = await promptText(
-      term,
-      'Plan date',
-      'Plan (YYYY-MM-DD or +Nd/+Nw, empty for none):',
-      '',
-      state.colorsDisabled
-    );
-    if (planInput === null) return;
-    const planParsed = parseManualDateInput(planInput) ?? undefined;
+    const planParsed = planRaw ? (parseManualDateInput(planRaw) ?? undefined) : undefined;
+    if (planRaw && !planParsed) {
+      state.message = `Invalid plan date: ${planRaw}`;
+      return;
+    }
 
-    const dueInput = await promptText(
-      term,
-      'Due date',
-      'Due (YYYY-MM-DD or +Nd/+Nw, empty for none):',
-      '',
-      state.colorsDisabled
-    );
-    if (dueInput === null) return;
-    const dueParsed = parseManualDateInput(dueInput) ?? undefined;
+    const dueParsed = dueRaw ? (parseManualDateInput(dueRaw) ?? undefined) : undefined;
+    if (dueRaw && !dueParsed) {
+      state.message = `Invalid due date: ${dueRaw}`;
+      return;
+    }
 
     const existingIds = getExistingIdsForProject(state.index.tasks, targetProject);
     const newId = generateNextId(existingIds);
     const created = todayIso();
+
     const metadata: TaskMetadata = {
       id: newId,
       created,
-      priority,
+      priority: priority ?? 'normal',
+      energy,
+      est: estRaw || undefined,
       bucket,
       plan: bucket === 'today' && !planParsed ? created : planParsed,
       due: dueParsed,
+      area: areaRaw || undefined,
+      tags: tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
     };
 
-    const insertResult = insertTask(state.index, targetProject, text.trim(), metadata);
+    const insertResult = insertTask(state.index, targetProject, picked.text.trim(), metadata);
     if (!insertResult.success) {
       state.message = insertResult.error ?? 'Failed to insert task';
       return;
@@ -1492,7 +1530,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const headingLevel = defaultProjectHeadingLevelForFile(filePath);
 
     const title = `Add project → ${path.basename(filePath)}`;
-    const nameInput = await promptText(term, title, 'Project name:', '', state.colorsDisabled);
+    const nameInput = await promptText(term, `${title} (1/3)`, 'Project name:', '', state.colorsDisabled);
     if (nameInput === null) return;
     const name = nameInput.trim();
     if (!name) {
@@ -1503,7 +1541,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const suggestedId = slugifyProjectId(name);
     const idInput = await promptText(
       term,
-      title,
+      `${title} (2/3)`,
       'Project id (slug):',
       suggestedId,
       state.colorsDisabled
@@ -1519,7 +1557,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    const areaInput = await promptText(term, title, 'Area (optional):', '', state.colorsDisabled);
+    const areaInput = await promptText(term, `${title} (3/3)`, 'Area (optional):', '', state.colorsDisabled);
     if (areaInput === null) return;
     const area = areaInput.trim() || undefined;
 
@@ -1666,16 +1704,63 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const isProjectsList = view.kind === 'projects' && !state.projects.drilldownProjectId;
     const width: number = term.width ?? process.stdout.columns ?? 80;
     const height: number = term.height ?? process.stdout.rows ?? 24;
-    const footerHeight = 8;
+    const footerHeight = getFooterHeight({ searchActive: state.search.active });
     const listTop = 5;
     const listHeight = Math.max(1, height - listTop - footerHeight);
 
     // Search mode
     if (state.search.active) {
+      // TAB: Apply autocomplete suggestion
+      if (name === 'TAB') {
+        if (
+          state.search.autocomplete.active &&
+          state.search.autocomplete.suggestions.length > 0
+        ) {
+          const selected =
+            state.search.autocomplete.suggestions[state.search.autocomplete.selectedIndex]!;
+          const context = state.search.autocomplete.context!;
+
+          const { newInput } = applySuggestion(
+            state.search.input,
+            state.search.input.length,
+            selected,
+            context
+          );
+
+          state.search.input = newInput;
+
+          // Regenerate autocomplete for new position
+          updateAutocomplete(state);
+          recompute(state);
+          render(state, term);
+          return;
+        }
+      }
+
+      // UP/DOWN: Navigate autocomplete suggestions
+      if (name === 'UP' && state.search.autocomplete.active) {
+        state.search.autocomplete.selectedIndex = Math.max(
+          0,
+          state.search.autocomplete.selectedIndex - 1
+        );
+        render(state, term);
+        return;
+      }
+
+      if (name === 'DOWN' && state.search.autocomplete.active) {
+        state.search.autocomplete.selectedIndex = Math.min(
+          state.search.autocomplete.suggestions.length - 1,
+          state.search.autocomplete.selectedIndex + 1
+        );
+        render(state, term);
+        return;
+      }
+
       if (name === 'z') {
         state.statusMode = state.statusMode === 'open' ? 'all' : 'open';
         state.query = normalizeStatusInQuery(state.query, state.statusMode);
         state.search.input = normalizeStatusInQuery(state.search.input, state.statusMode);
+        updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
@@ -1684,6 +1769,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         state.query = normalizeStatusInQuery(state.search.input.trim(), state.statusMode);
         state.search.active = false;
         state.search.input = '';
+        state.search.autocomplete.active = false;
         recompute(state);
         render(state, term);
         return;
@@ -1691,6 +1777,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       if (name === 'ESCAPE') {
         state.search.active = false;
         state.search.input = '';
+        state.search.autocomplete.active = false;
         recompute(state);
         render(state, term);
         return;
@@ -1708,24 +1795,28 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
           state.search.scope = 'view';
           state.search.input = `${base}${state.search.input ? ` ${state.search.input}` : ''}`.trim();
         }
+        updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
       }
       if (name === 'BACKSPACE') {
         state.search.input = state.search.input.slice(0, -1);
+        updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
       }
       if (isSpaceKeyName(name)) {
         state.search.input += ' ';
+        updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
       }
       if (name.length === 1) {
         state.search.input += name;
+        updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
@@ -1744,6 +1835,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       state.search.active = true;
       state.search.scope = 'view';
       state.search.input = ensureTrailingSpace(state.query);
+      updateAutocomplete(state);
       render(state, term);
       return;
     }

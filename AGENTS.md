@@ -16,6 +16,11 @@ pnpm typecheck         # Type check
 | `cli-architecture.md` | **Architecture** - project structure, config, ID system, index schema |
 | `todo-format-spec.md` | **Task format** - markdown syntax, metadata keys, shorthands |
 | `commands/*.md` | **Command specs** - detailed spec per command |
+| `tui.md` | **TUI overview** - interactive mode summary and UX notes |
+| `tui_specs.md` | **TUI requirements** - expected behaviors, layout, keybindings |
+| `tui-architecture.md` | **TUI architecture** - state model, rendering, input handling |
+| `tui_implementation_details.md` | **TUI implementation map** - entry points, safety, keybindings |
+| `tui_implementation_plan.md` | **TUI milestones** - non-goals, phases |
 
 ## Key Concepts
 - **Global ID**: `<project-id>:<local-id>` (e.g., `as-onb:1.1`)
@@ -36,4 +41,15 @@ src/indexer/     # Build todos.json
 src/editor/      # Task editing (done/undone/add)
 src/linter/rules # 12 lint rules
 src/schema/      # Zod schemas
+src/tui/         # Terminal UI (interactive)
 ```
+
+## "Update docs" means
+
+When a change affects user-facing behavior, requirements, or design decisions, update the relevant docs in addition to code:
+
+- **Requirements/behavior**: update `local_doc/*_specs.md` (or `local_doc/commands/*.md` if it's a command).
+- **Technical changes**: update the relevant `local_doc/*architecture*.md` / `*_implementation_details.md` when key flow/state/keybindings change.
+- **Progress/changelog**:
+  - update `local_doc/plan.md` if the change materially advances the roadmap
+  - update the changelog section in the relevant doc (e.g. `local_doc/tui.md`) when the UX/keybindings change

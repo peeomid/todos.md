@@ -204,24 +204,24 @@ Acceptance:
 
 - Popup editor with two fields:
   - task text
-  - metadata block (raw `[key:value ...]` or parsed UI; v1 can be raw with validation)
+  - metadata inner content (`key:value ...`, saved as a `[ ... ]` block)
 - Save rewrites the task line and updates in-memory data.
+- Use search-style autocomplete for metadata keys/values (shared with `/` search).
 
 Acceptance:
 - Editing doesn’t corrupt metadata ordering rules and keeps task mapping stable.
 
 ### Milestone 6 — `a` add task flow
 
-- Multi-prompt flow as spec:
-  1) task text
-  2) priority
-  3) bucket
-  4) plan
-  5) due
+- Single modal with multiple fields:
+  1) project (typeahead suggestions)
+  2) task text
+  3) metadata inner content (`key:value ...`, optional; autocomplete)
 - Determine target project:
   - if in project view: current project
   - otherwise: configured `defaultProject` (or `inbox` fallback)
 - Append under correct project heading and generate next ID.
+- Parse metadata input to populate fields like `priority`, `bucket`, `plan`, `due`, etc.
 
 Acceptance:
 - Newly created tasks appear immediately in the current view if they match.

@@ -52,8 +52,8 @@ export async function runEditFlow(options: {
 
   const choice = await showKeyMenu(
     term,
-    `Edit: ${task.globalId}`,
-    ['[t] text (task description)', '[m] metadata ([key:value ...])', '[Enter] text'],
+    `Edit task — ${task.globalId}`,
+    ['Choose what to edit:', '', '[t] text (task description)', '[m] metadata ([key:value ...])', '[Enter] text'],
     ['t', 'm'],
     colorsDisabled,
     { enter: 't' }
@@ -61,7 +61,7 @@ export async function runEditFlow(options: {
   if (!choice) return { ok: false, canceled: true };
 
   if (choice === 't') {
-    const nextText = await promptText(term, `Edit text: ${task.globalId}`, 'Task text:', task.text, colorsDisabled);
+    const nextText = await promptText(term, `Edit task text — ${task.globalId}`, 'Task text:', task.text, colorsDisabled);
     if (nextText === null) return { ok: false, canceled: true };
     const currentMeta = readMetadataBlockString(task);
     return { ok: true, text: nextText.trim(), metadataBlock: currentMeta.trim() };
@@ -71,7 +71,7 @@ export async function runEditFlow(options: {
     const currentMeta = readMetadataBlockString(task);
     const input = await promptText(
       term,
-      `Edit metadata: ${task.globalId}`,
+      `Edit metadata — ${task.globalId}`,
       'Metadata block ([key:value ...], empty clears):',
       currentMeta,
       colorsDisabled

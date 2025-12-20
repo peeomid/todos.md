@@ -10,6 +10,10 @@ This document describes the concrete implementation of the TUI specified in `loc
   - Exit: runs `index` again and then runs `sync` once (only if `views` are configured)
 - TUI runtime: `src/tui/interactive.ts`
   - Uses `terminal-kit` to manage full-screen mode + keyboard input
+- Autocomplete logic: `src/tui/autocomplete.ts`
+  - Filter key/value suggestions
+  - Context detection (typing key vs value)
+  - Dynamic value extraction from task index
 
 ## Startup / Exit Lifecycle
 
@@ -60,6 +64,39 @@ Sorting:
 - Supports stable multi-field sorting via `sortTasksByFields()` (left-to-right priority).
 - Custom views can set `sort: "bucket,plan,due"`.
 
+## Autocomplete (Search Enhancement)
+
+Implementation in `src/tui/autocomplete.ts`:
+
+**Data structures:**
+- `AutocompleteSuggestion`: represents a single suggestion (type: key/value, text, display)
+- `AutocompleteContext`: tracks what user is typing (current token, filter key if typing value, cursor position)
+- `AutocompleteState`: manages active suggestions, selected index, current context
+- `FILTER_SPECS`: registry of all available filter keys with their valid values
+
+**Core functions:**
+- `getAutocompleteContext(input, cursorPos)`: analyzes input to determine if user is typing a filter key or value
+- `generateSuggestions(context, allTasks)`: produces suggestions based on current context
+  - Filter key suggestions: matches partial input against known filter keys
+  - Static value suggestions: returns predefined values (e.g., `bucket: today/upcoming/anytime/someday`)
+  - Dynamic value suggestions: extracts unique values from task index (e.g., project IDs, areas, tags)
+  - Date suggestions: provides `today`, `tomorrow`, and format hints
+- `applySuggestion(input, cursorPos, suggestion, context)`: replaces current token with selected suggestion
+
+**Integration with search mode:**
+- Autocomplete state added to `TUIState.search.autocomplete`
+- `updateAutocomplete(state, allTasks)` called on every keystroke in search mode
+- Tab key applies selected suggestion
+- Up/Down arrows navigate suggestions (when autocomplete is active)
+- Suggestions render in an inline panel below the search prompt with `renderAutocompleteSuggestions()`
+
+**Dynamic value extraction:**
+- Projects: extracted from `task.project` across all tasks
+- Areas: extracted from `task.area` across all tasks
+- Tags: extracted from `task.tags[]` across all tasks
+- Parents: extracted from `task.parent` across all tasks
+- Limited to 10 suggestions for performance
+
 ## Screen Model / State
 
 `src/tui/interactive.ts` keeps a single `SessionState` with:
@@ -91,6 +128,7 @@ Global:
 - `?` shorthand help (priority/bucket)
 - in search: type filters or plain words (plain words are treated as `text:` filters)
 - in search: `Enter` applies and returns to list; `Esc`/`Ctrl+C` cancels; `!`/`Ctrl+/` toggles scope; `z` toggles status mode
+- in search (autocomplete): `Tab` accepts suggestion; `↑/↓` navigate suggestions; typing filters suggestions in real-time
 
 Movement:
 - `j/k` or `↑/↓` move
@@ -107,12 +145,16 @@ Task actions:
   - plus rule: if bucket becomes `today` and `plan` is empty, set `plan` to today
 - `n` plan menu (today/manual/clear)
 - `d` due menu (today/manual/clear)
-- `e` edit menu:
-  - `t` edits task text only
-  - `m` edits metadata block only (`[key:value ...]`)
-- `a` add task flow (choose destination project → text → priority → bucket → plan → due)
-  - Defaults destination by context: project drilldown → single-project list → selected task’s project → `interactive.defaultProject`
-  - `Tab` opens a typeahead project picker before entering task text
+- `e` edit modal (Text + Meta):
+  - Multi-field, command-line-style UX
+  - `Tab`: apply autocomplete if a list is open, otherwise move to next field
+  - `Shift+Tab`: previous field (best-effort; terminal support varies)
+  - `Enter`: apply suggestion if list is open; otherwise next field / save on final field
+  - `↑/↓`: navigate suggestions if list is open; otherwise move between fields
+- `a` add task modal (Project + Text + Meta):
+  - Same key semantics as `e`
+  - Default destination still inferred by context (project drilldown → single-project list → selected task’s project → `interactive.defaultProject`), but the modal always starts focused on Project so the destination is explicit/editable
+  - Metadata uses shared autocomplete UI (same renderer as `/` search)
 
 Projects view:
 - `Enter` drills down into a project (shows that project’s tasks)

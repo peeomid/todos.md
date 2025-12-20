@@ -121,4 +121,5 @@ Task actions:
 
 Add destination:
 - `a` chooses a destination project by context: project drilldown → single-project list → selected task’s project → Inbox fallback (`interactive.defaultProject`, default `"inbox"`).
-- Before entering task text, `Tab` opens a typeahead project picker to change the destination, and the add header always shows `Add task → <projectId> — <project name>`.
+- `a` opens a 3-field add modal (Project + Text + Meta). The destination is prefilled by context, but Project is always the first focused field so it’s explicit.
+- Autocomplete is shared with search: when a suggestion list is visible, `Tab`/`Enter` selects; otherwise `Tab` advances fields.

@@ -47,3 +47,5 @@
 - TUI: Projects view `[a]` adds a new project and auto-switches into that project’s drilldown view (2025-12-19)
 - `tmd interactive`: added `--input`/`--out` aliases for selecting input/output files (2025-12-19)
 - TUI reliability: avoid “Working…” freezes by allowing quit while busy and catching async key-handler errors (2025-12-19)
+- TUI: search autocomplete fixes — panel space reserved + `bucket:` key completion keeps cursor after colon (2025-12-20)
+- TUI: consistent input field UX — visible cursor + bracketed input field in search, promptText, and project picker (2025-12-20)
