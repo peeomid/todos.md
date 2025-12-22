@@ -129,6 +129,7 @@ Global:
 - `0–9` jump to view
 - `h/l` or `←/→` previous/next view
 - `z` show/hide done (query rewrite)
+- `o` toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line
 - `/` enter live search (prefilled with current query + a trailing space)
 - `?` shorthand help (priority/bucket)
 - in search: type filters or plain words (plain words are treated as `text:` filters)
@@ -141,7 +142,8 @@ Movement:
 - `Ctrl+U`/`Ctrl+D` half-page
 - `PgUp`/`PgDn` half-page (best-effort; depends on terminal-kit key mapping)
 - `:` go to line (row-number jump in task list)
-- `Enter` toggles fold/unfold on area headers, project headers, and tasks with children
+- `f` toggles fold/unfold on area headers, project headers, and tasks with children
+- `F` folds/unfolds everything
 
 Task actions:
 - `space` toggle done (done cascades to all descendants; undone does not cascade)

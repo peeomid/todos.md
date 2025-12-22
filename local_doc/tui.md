@@ -15,8 +15,9 @@
 - CLI params: `--file/--input/-f` and `--output/--out/-o` to choose input/output paths
 - Startup/exit lifecycle: start runs `enrich → index → load`, exit runs `index → (optional) sync` once
 - Views: built-ins `0–6` (0=All, 1=Now, 2=Today) + custom views via `interactive.views[]` in config
-- Navigation + toggles: `0–9`, `h/l` or arrows, `z` show/hide done (query rewrite), `/` live search with scope toggle and inline autocomplete
-- Task list UX: row numbers column, `:` go-to-line, selectable area/project headers and tasks, `Enter` folds/unfolds an area, project, or task subtree (with ▾/▸ indicator)
+- Navigation + toggles: `0–9`, `h/l` or arrows, `z` show/hide done (query rewrite), `o` priority ordering (high-first / low-first / off), `/` live search with scope toggle and inline autocomplete
+- Task list UX: row numbers column, `:` go-to-line, selectable area/project headers and tasks, `f` folds/unfolds an area, project, or task subtree (with ▾/▸ indicator)
+- Task list UX: `F` folds/unfolds everything.
 - Structure: subtasks render indented with a visible prefix marker
 - Quit ergonomics: `Ctrl+C` twice quits (first press shows a prompt)
 - Task actions: toggle done (with cascade on done), set priority/bucket/plan/due, toggle `bucket:now`, inline edit, add task flow
@@ -41,6 +42,8 @@
 - 2025-12-20: Input fields now support cursor movement + word/line jumps (arrows/Home/End, Ctrl+A/E, Option+←/→/Backspace, Ctrl+U/K). Add-task project field shows `projectId — project name` when selected. Projects view shows aligned `id — name` (no file paths).
 - 2025-12-20: Added `bucket:now` (working on right now): new built-in `Now` view (`1`) + `n` toggles now on/off for the selected task.
 - 2025-12-22: Rekeyed built-in views (`0` All, `1` Now, `2` Today, …, `6` Projects), moved plan hotkey to `t`, and added `*`/`@now` shorthands for `bucket:now`.
-- 2025-12-22: Task list improvements: row-number column, `:` go-to-line, selectable + foldable headers (Enter toggles), clearer subtask indentation, and `bucket:now` background highlight.
+- 2025-12-22: Task list improvements: row-number column, `:` go-to-line, selectable + foldable headers (`f` toggles), clearer subtask indentation, and `bucket:now` background highlight.
 - 2025-12-22: Projects list improvements: type-to-filter by default with arrow-only navigation (vim keys disabled in that list).
 - 2025-12-22: Added area-heading grouping in task lists (e.g. `# Work [area:work]` appears above its projects when there are matching tasks in the current view).
+- 2025-12-22: Added fold/unfold-all (`F`) and `o` priority-order toggle; current priority order is shown in the header flags (next to hide/show done).
+- 2025-12-22: Fixed priority ordering toggle applying in all views (not just single-project drilldown).

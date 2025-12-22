@@ -200,6 +200,18 @@ Default sort within bucket views:
 
 ---
 
+## 2025-12-22: TUI Priority Order Toggle + Fold/Unfold All
+
+### Overview
+- Added `o` to toggle priority ordering: high-first → low-first → off.
+- Added `f` to fold/unfold the selected row, and `F` to fold/unfold everything (reliable across terminals).
+- Header “Flags” line now surfaces the current priority ordering mode alongside hide/show done.
+
+### Files Updated
+- `tui_specs.md` — keybindings + header/help examples updated
+
+---
+
 ## 2025-12-19: TUI Search Apply/Cancel + Delete Action + TUI Architecture Doc
 
 ### Overview

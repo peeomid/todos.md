@@ -13,6 +13,7 @@ import {
   filterByText,
   groupTasks,
   sortTasksByFields,
+  sortTasksByFieldsWithOverrides,
   type SortField,
 } from '../query/filters.js';
 import { markTaskDone, markTaskUndone } from '../editor/task-editor.js';
@@ -47,6 +48,8 @@ import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor
 
 type Term = any;
 
+type PriorityOrderMode = 'high' | 'low' | 'none';
+
 interface InteractiveView {
   key: string; // '0'..'9'
   name: string;
@@ -68,6 +71,7 @@ interface SessionState {
   views: InteractiveView[];
   viewIndex: number;
   statusMode: 'open' | 'all';
+  priorityOrder: PriorityOrderMode;
   query: string;
   command: {
     active: boolean;
@@ -121,6 +125,49 @@ function normalizeStatusInQuery(query: string, statusMode: 'open' | 'all'): stri
 function ensureTrailingSpace(input: string): string {
   const trimmedEnd = input.replace(/\s+$/, '');
   return trimmedEnd ? `${trimmedEnd} ` : '';
+}
+
+function describePriorityOrderMode(mode: PriorityOrderMode): string {
+  switch (mode) {
+    case 'high':
+      return 'pri:high-first';
+    case 'low':
+      return 'pri:low-first';
+    case 'none':
+      return 'pri:off';
+    default:
+      return 'pri:high-first';
+  }
+}
+
+function cyclePriorityOrderMode(mode: PriorityOrderMode): PriorityOrderMode {
+  if (mode === 'high') return 'low';
+  if (mode === 'low') return 'none';
+  return 'high';
+}
+
+function applyPriorityOrder(
+  fields: SortField[],
+  mode: PriorityOrderMode
+): { fields: SortField[]; priorityOrderOverride: 'low-first' | null } {
+  const seen = new Set<SortField>();
+  const withoutDupes = fields.filter((f) => {
+    if (seen.has(f)) return false;
+    seen.add(f);
+    return true;
+  });
+
+  if (mode === 'none') {
+    return { fields: withoutDupes.filter((f) => f !== 'priority'), priorityOrderOverride: null };
+  }
+
+  if (withoutDupes.includes('priority')) {
+    return { fields: withoutDupes, priorityOrderOverride: mode === 'low' ? 'low-first' : null };
+  }
+
+  const insertAt = withoutDupes[0] === 'project' ? 1 : 0;
+  const next: SortField[] = [...withoutDupes.slice(0, insertAt), 'priority', ...withoutDupes.slice(insertAt)];
+  return { fields: next, priorityOrderOverride: mode === 'low' ? 'low-first' : null };
 }
 
 function parseSortSpec(spec: string | undefined): SortField[] {
@@ -268,6 +315,8 @@ function getFooterHelpLines(
     '[h/l/←/→] views',
     '[/] search',
     '[z] show/hide done',
+    '[o] pri order',
+    '[F] fold all',
     '[?] help',
     '[q] quit',
   ];
@@ -278,7 +327,8 @@ function getFooterHelpLines(
   if (view.kind === 'projects' && state.projects.drilldownProjectId) {
     const full = [
       '[Esc/Backspace] back',
-      '[Enter] fold',
+      '[f] fold',
+      '[F] fold all',
       '[:] goto line',
       '[space/x] done',
       '[p] pri',
@@ -296,7 +346,8 @@ function getFooterHelpLines(
   }
 
   const tasksFull = [
-    '[Enter] fold',
+    '[f] fold',
+    '[F] fold all',
     '[:] goto line',
     '[space/x] done',
     '[p] priority',
@@ -475,7 +526,7 @@ function render(state: SessionState, term: Term): void {
   const queryRaw = state.search.active ? state.search.input.value : state.query;
   const query = normalizeStatusInQuery(queryRaw, state.statusMode);
   const flags = state.statusMode === 'open' ? 'hide-done' : 'show-done';
-  const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}`;
+  const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}`;
   term.moveTo(1, 3);
   if (state.colorsDisabled) {
     style.dim(truncate(queryLine, width));
@@ -484,7 +535,7 @@ function render(state: SessionState, term: Term): void {
       [
         { text: `View: ${modeTitle} (${view.key}) | Query: `, style: 'dim' },
         { text: query, style: 'queryAccent' },
-        { text: ` | Flags: ${flags}`, style: 'dim' },
+        { text: ` | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}`, style: 'dim' },
       ],
       width
     );
@@ -922,9 +973,14 @@ function recompute(state: SessionState): void {
   const sortSpec = inProjectDrilldown ? undefined : view.sort;
   const sortFields = parseSortSpec(sortSpec);
   const drilldownDefaultSort: SortField[] = ['priority', 'plan', 'due'];
-  const fields = sortFields.length > 0 ? sortFields : inProjectDrilldown ? drilldownDefaultSort : defaultSortForView(view);
+  const baseFields =
+    sortFields.length > 0 ? sortFields : inProjectDrilldown ? drilldownDefaultSort : defaultSortForView(view);
+  const { fields, priorityOrderOverride } = applyPriorityOrder(baseFields, state.priorityOrder);
   if (fields.length > 0) {
-    tasks = sortTasksByFields(tasks, fields);
+    tasks =
+      priorityOrderOverride === 'low-first'
+        ? sortTasksByFieldsWithOverrides(tasks, fields, { priorityOrder: 'low-first' })
+        : sortTasksByFields(tasks, fields);
   }
 
   state.filteredTasks = tasks;
@@ -1284,6 +1340,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     views: buildViews(options.config),
     viewIndex: 2, // default Today
     statusMode: 'open',
+    priorityOrder: 'high',
     query: '',
     command: { active: false, kind: null, input: createTextInput('') },
     search: {
@@ -2176,6 +2233,14 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
+    // Priority ordering toggle: high-first → low-first → off
+    if (!isProjectsList && (name === 'o' || name === 'O')) {
+      state.priorityOrder = cyclePriorityOrderMode(state.priorityOrder);
+      recompute(state);
+      render(state, term);
+      return;
+    }
+
     // Projects list: enter drilldown
     if (isProjectsList && name === 'ENTER') {
       const p = getSelectedProject(state);
@@ -2248,8 +2313,48 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    // Task list: Enter toggles project folding on headers
-    if (!isProjectsList && name === 'ENTER') {
+    // Task list: Fold/unfold everything.
+    // Use `F` (Shift+f) so it pairs with `Enter` (fold one row) and works reliably in most terminals.
+    if (!isProjectsList && name === 'F') {
+      const areaKeys = new Set<string>();
+      const projectIds = new Set<string>();
+      const taskIds = new Set<string>();
+
+      for (const row of state.renderRows) {
+        if (row.kind === 'area') areaKeys.add(row.area);
+        if (row.kind === 'header') projectIds.add(row.projectId);
+        if (row.kind === 'task') {
+          const hasChildren = (row.task.childrenIds?.length ?? 0) > 0;
+          if (hasChildren) taskIds.add(row.task.globalId);
+        }
+      }
+
+      const foldableCount = areaKeys.size + projectIds.size + taskIds.size;
+      if (foldableCount > 0) {
+        const allCollapsed =
+          [...areaKeys].every((a) => state.collapsedAreas.has(a)) &&
+          [...projectIds].every((p) => state.collapsedProjects.has(p)) &&
+          [...taskIds].every((t) => state.collapsedTasks.has(t));
+
+        if (allCollapsed) {
+          state.collapsedAreas.clear();
+          state.collapsedProjects.clear();
+          state.collapsedTasks.clear();
+        } else {
+          for (const a of areaKeys) state.collapsedAreas.add(a);
+          for (const p of projectIds) state.collapsedProjects.add(p);
+          for (const t of taskIds) state.collapsedTasks.add(t);
+        }
+
+        recompute(state);
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+      }
+      return;
+    }
+
+    // Task list: "f" toggles fold/unfold on the selected row
+    if (!isProjectsList && name === 'f') {
       const row = state.renderRows[state.selection.row];
       if (row?.kind === 'area') {
         const area = row.area;

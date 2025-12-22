@@ -70,7 +70,7 @@ Rough layout:
 │ life — Life Admin (1 task)                                                   │
 │ [x] (B) ~  Call bank about card          life:2     plan:2025-12-18   15m    │
 │                                                                              │
-│ View: Today (2)  |  Query: status:open bucket:today  |  Flags: hide-done    │
+│ View: Today (2)  |  Query: status:open bucket:today  |  Flags: hide-done, pri:high-first │
 ├──────────────────────────── Details / Help ──────────────────────────────────┤
 │ Draft welcome email                                                         │
 │ project: as-onb   area: sidebiz   bucket: today   priority: high            │
@@ -78,7 +78,7 @@ Rough layout:
 │ file: projects/autosenso.md:23                                              │
 │──────────────────────────────────────────────────────────────────────────────│
 │ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [n] now  [/] search   │
-│ [t] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [q] quit       │
+│ [t] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [o] pri order  [q] quit │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -211,8 +211,8 @@ Rendering rule (v1):
 * Project grouping:
   * `projectId — project name (count task(s))`
   * Headers are selectable.
-  * `Enter` toggles fold/unfold for the selected header (shows ▾/▸); folded projects hide their task rows.
-  * `Enter` also toggles fold/unfold for a selected task that has subtasks (shows ▾/▸); folded tasks hide all descendants in the list (even if sorting would otherwise place them elsewhere).
+  * `f` toggles fold/unfold for the selected header (shows ▾/▸); folded projects hide their task rows.
+  * `f` also toggles fold/unfold for a selected task that has subtasks (shows ▾/▸); folded tasks hide all descendants in the list (even if sorting would otherwise place them elsewhere).
   * The task list shows a leftmost row-number column (1-based), and `:` opens a go-to-line prompt to jump to a specific row.
   * Projects that are in-scope for the current view (e.g. `project:` filters) may still be shown even if they have 0 matching tasks.
 
@@ -256,6 +256,7 @@ Help is always displayed at the bottom (below the details panel).
 * `h` / `←` – previous view.
 * `l` / `→` – next view.
 * `?` – show shorthand help (priority/bucket shorthands displayed in task rows).
+* `o` – toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line.
 
 ### 4.2. Task list navigation (vim style + arrows)
 
@@ -266,7 +267,8 @@ Help is always displayed at the bottom (below the details panel).
 * `Ctrl+U` / `PgUp` – half page up.
 * `Ctrl+D` / `PgDn` – half page down.
 * `:` – open “go to line” prompt; type a row number and press Enter to jump.
-* `Enter` – fold/unfold when the selection is on a project header row, or a task row with subtasks.
+* `f` – fold/unfold when the selection is on a project header row, or a task row with subtasks.
+* `F` – fold/unfold everything.
 
 ---
 
@@ -415,7 +417,7 @@ The top bar’s “Query” section shows:
 * E.g. in search:
 
  ```text
- View: Today (2) | Query: status:open bucket:today text:stripe priority:high | Flags: hide-done
+ View: Today (2) | Query: status:open bucket:today text:stripe priority:high | Flags: hide-done, pri:high-first
  ```
 
 ---
@@ -436,7 +438,7 @@ Behavior:
 
  * Show both open and done tasks (`status:any`).
 * This wraps around the current query (view + search).
-* Top bar “Flags” section shows `hide-done` or `show-done`.
+* Top bar “Flags” section shows `hide-done` or `show-done`, plus the current priority ordering mode (e.g. `pri:high-first`).
 
 Implementation detail:
 

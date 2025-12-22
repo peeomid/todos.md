@@ -289,9 +289,7 @@ function compareBySortField(a: Task, b: Task, sortBy: SortField): number {
       return a.created.localeCompare(b.created);
     }
     case 'project': {
-      const projectCmp = a.projectId.localeCompare(b.projectId);
-      if (projectCmp !== 0) return projectCmp;
-      return a.localId.localeCompare(b.localId, undefined, { numeric: true });
+      return a.projectId.localeCompare(b.projectId);
     }
     case 'energy': {
       const aOrder = ENERGY_ORDER[a.energy ?? 'normal'] ?? 2;
@@ -329,6 +327,39 @@ export function sortTasksByFields(tasks: Task[], sortBy: SortField[]): Task[] {
       const cmp = compareBySortField(a.task, b.task, field);
       if (cmp !== 0) return cmp;
     }
+    // Deterministic tie-breaker: keep task ordering stable by id.
+    const projectCmp = a.task.projectId.localeCompare(b.task.projectId);
+    if (projectCmp !== 0) return projectCmp;
+    const localCmp = a.task.localId.localeCompare(b.task.localId, undefined, { numeric: true });
+    if (localCmp !== 0) return localCmp;
+    return a.idx - b.idx;
+  });
+  return indexed.map((x) => x.task);
+}
+
+export function sortTasksByFieldsWithOverrides(
+  tasks: Task[],
+  sortBy: SortField[],
+  overrides?: { priorityOrder?: 'high-first' | 'low-first' }
+): Task[] {
+  const indexed = tasks.map((task, idx) => ({ task, idx }));
+  indexed.sort((a, b) => {
+    for (const field of sortBy) {
+      const cmp =
+        field === 'priority' && overrides?.priorityOrder === 'low-first'
+          ? (() => {
+              const order: Record<string, number> = { low: 1, normal: 2, high: 3 };
+              const aOrder = a.task.priority ? (order[a.task.priority] ?? 4) : 4;
+              const bOrder = b.task.priority ? (order[b.task.priority] ?? 4) : 4;
+              return aOrder - bOrder;
+            })()
+          : compareBySortField(a.task, b.task, field);
+      if (cmp !== 0) return cmp;
+    }
+    const projectCmp = a.task.projectId.localeCompare(b.task.projectId);
+    if (projectCmp !== 0) return projectCmp;
+    const localCmp = a.task.localId.localeCompare(b.task.localId, undefined, { numeric: true });
+    if (localCmp !== 0) return localCmp;
     return a.idx - b.idx;
   });
   return indexed.map((x) => x.task);
@@ -431,4 +462,3 @@ export function parseQueryString(query: string): string[] {
     .map((x) => x.trim())
     .filter(Boolean);
 }
-
