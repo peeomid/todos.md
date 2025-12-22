@@ -36,9 +36,25 @@ cd /path/to/todosmd
 pnpm build
 ```
 
-### Step 2: Install globally via npm link
+### Step 2: Install globally (so `tmd` works anywhere)
+
+#### Option A: `npm link` (simplest)
 
 ```bash
+# Creates a global symlink to your local development version
+npm link
+
+# Now you can use `tmd` from anywhere
+tmd --help
+tmd list -f ~/todos/work.md
+```
+
+#### Option B: `pnpm link --global` (requires one-time setup)
+
+```bash
+# One-time setup so pnpm has a global bin directory on your PATH
+pnpm setup
+
 # Creates a global symlink to your local development version
 pnpm link --global
 
@@ -50,6 +66,10 @@ tmd list -f ~/todos/work.md
 ### To unlink later
 
 ```bash
+# If you used `npm link`
+npm unlink
+
+# If you used `pnpm link --global`
 pnpm unlink --global
 ```
 

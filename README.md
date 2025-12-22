@@ -9,6 +9,17 @@ pnpm install
 pnpm build
 ```
 
+### Install system-wide (so `tmd` works anywhere)
+
+```bash
+# Option A (works out of the box for most Node setups)
+npm link
+
+# Option B (pnpm global link) — requires pnpm global bin dir in PATH
+pnpm setup
+pnpm link --global
+```
+
 ## Usage
 
 ```bash
