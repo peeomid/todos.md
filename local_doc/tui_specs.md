@@ -62,7 +62,7 @@ Rough layout:
 
 ```text
 ┌────────────────────────── tmd – Today (bucket:today) ──────────────────────────┐
-[1] Today [2] Upcoming [3] Anytime [4] Someday [5] Projects [/] Search 
+[0] All [1] Now [2] Today [3] Upcoming [4] Anytime [5] Someday [6] Projects [/] Search 
 ├────────────────────────────── Task List ─────────────────────────────────────┤
 │ as-onb — Autosenso Onboarding (2 tasks)                                      │
 │ [ ] (A) !  Draft welcome email           as-onb:1   plan:2025-12-18   60m    │
@@ -70,15 +70,15 @@ Rough layout:
 │ life — Life Admin (1 task)                                                   │
 │ [x] (B) ~  Call bank about card          life:2     plan:2025-12-18   15m    │
 │                                                                              │
-│ View: Today (1)  |  Query: status:open bucket:today  |  Flags: hide-done    │
+│ View: Today (2)  |  Query: status:open bucket:today  |  Flags: hide-done    │
 ├──────────────────────────── Details / Help ──────────────────────────────────┤
 │ Draft welcome email                                                         │
 │ project: as-onb   area: sidebiz   bucket: today   priority: high            │
 │ energy: normal   plan: 2025-12-18   due: -   est: 60m                       │
 │ file: projects/autosenso.md:23                                              │
 │──────────────────────────────────────────────────────────────────────────────│
-│ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [/] search   │
-│ [n] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [q] quit       │
+│ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [n] now  [/] search   │
+│ [t] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [q] quit       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,7 +100,7 @@ Use a small, meaningful color palette:
 * **Bucket / priority shorthands (in task rows)**:
 
  * Priority (first token after checkbox): `(A)` high, `(B)` normal, `(C)` low
- * Bucket (next token, after optional priority): `!` today, `>` upcoming, `~` anytime, `?` someday
+* Bucket (next token, after optional priority): `*` now, `!` today, `>` upcoming, `~` anytime, `?` someday
 * **Task text vs metadata**:
 
  * Task text: normal/bright.
@@ -110,6 +110,8 @@ Use a small, meaningful color palette:
  * The `Query:` value in the header should use a distinct accent color (so it’s noticeable even when the rest of the header is dim).
 * **Bucket** (in details or small tag in list):
 
+ * `now` – strong accent (e.g. green) and the bucket shorthand (`*`) should be clearly visible.
+ * `now` tasks should also be visually distinct in the list (e.g. subtle background highlight).
  * `today` – accent (e.g. cyan) and the bucket shorthand (`!`) should be clearly visible.
  * `upcoming` – another accent (e.g. blue).
  * `someday` – dim.
@@ -152,35 +154,43 @@ Built-ins (v1):
  * `key: "0"`
  * `name: "All"`
  * `base query`: all tasks (filtered by show/hide done flag).
-* **1 – Today**
+* **1 – Now**
 
  * `key: "1"`
+ * `name: "Now"`
+ * `base query`: `status:open bucket:now`
+
+* **2 – Today**
+
+ * `key: "2"`
  * `name: "Today"`
  * `base query`: `status:open bucket:today`
 
  * (optional extension later: include `plan:today` / `due:today` / overdue).
-* **2 – Upcoming**
-
- * `key: "2"`
- * `name: "Upcoming"`
- * `base query`: `status:open bucket:upcoming`
-* **3 – Anytime**
+* **3 – Upcoming**
 
  * `key: "3"`
- * `name: "Anytime"`
- * `base query`: `status:open bucket:anytime`
-* **4 – Someday**
+ * `name: "Upcoming"`
+ * `base query`: `status:open bucket:upcoming`
+* **4 – Anytime**
 
  * `key: "4"`
- * `name: "Someday"`
- * `base query`: `status:open bucket:someday`
-* **5 – Projects**
+ * `name: "Anytime"`
+ * `base query`: `status:open bucket:anytime`
+* **5 – Someday**
 
  * `key: "5"`
+ * `name: "Someday"`
+ * `base query`: `status:open bucket:someday`
+* **6 – Projects**
+
+ * `key: "6"`
  * `name: "Projects"`
  * Shows a list of projects, not tasks.
+ * The projects list supports “type to filter” by default (live substring match on `id`, `name`, and `area`).
+ * In the projects list, list movement uses arrow keys (↑/↓) rather than vim keys.
  * Selecting a project opens a project-specific task list (like `status:open project:<id>`).
- * `[a]` adds a new project and immediately switches into that project’s drilldown view.
+ * `Ctrl+N` adds a new project and immediately switches into that project’s drilldown view.
  * Add-project flow guidance (v1):
    - No file picker. The project is added to the “current file”:
      - If a project row is selected, use that project’s `filePath`.
@@ -189,13 +199,22 @@ Built-ins (v1):
    - No heading-level prompt. Heading level is auto-chosen (`#` vs `##`) based on the destination file’s existing structure.
    - First prompt is always the name: `Project name: _` (Enter saves, Esc cancels).
    - Follow-ups:
-     - `Project id (slug):` (pre-filled; Enter accepts)
-     - `Area (optional):`
+   - `Project id (slug):` (pre-filled; Enter accepts)
+   - `Area (optional):`
 
 Rendering rule (v1):
-* All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are **grouped by project** with a header row:
+* All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are grouped hierarchically:
+  * If present in the Markdown, **area headings** (headings with `area:` but no `project:`) render as a parent header row above their projects.
+  * Projects render as a header row under the area header (if any).
+  * Tasks render under their project header.
+  * Area headers are shown in **every view**, but only when they have ≥1 matching task in that view (no “empty” area headers).
+* Project grouping:
   * `projectId — project name (count task(s))`
-  * Headers are visual only (not collapsible/selectable).
+  * Headers are selectable.
+  * `Enter` toggles fold/unfold for the selected header (shows ▾/▸); folded projects hide their task rows.
+  * `Enter` also toggles fold/unfold for a selected task that has subtasks (shows ▾/▸); folded tasks hide all descendants in the list (even if sorting would otherwise place them elsewhere).
+  * The task list shows a leftmost row-number column (1-based), and `:` opens a go-to-line prompt to jump to a specific row.
+  * Projects that are in-scope for the current view (e.g. `project:` filters) may still be shown even if they have 0 matching tasks.
 
 ### 3.2. Custom views (config)
 
@@ -246,6 +265,8 @@ Help is always displayed at the bottom (below the details panel).
 * `G` – jump to bottom.
 * `Ctrl+U` / `PgUp` – half page up.
 * `Ctrl+D` / `PgDn` – half page down.
+* `:` – open “go to line” prompt; type a row number and press Enter to jump.
+* `Enter` – fold/unfold when the selection is on a project header row, or a task row with subtasks.
 
 ---
 
@@ -260,6 +281,17 @@ Behavior:
 * A search bar appears at bottom.
 * Input is **pre-filled** with the current query for the view, plus a trailing space (so you can type immediately).
 * On every keypress, the task list is re-filtered.
+* You can edit anywhere in the search string (not just at the end).
+
+Editing inside the search bar (best-effort; depends on terminal key mapping):
+
+* `←/→` — move cursor
+* `Home/End` (or `Ctrl+A` / `Ctrl+E`) — start/end of line
+* `Option+←/→` (or `Ctrl+←/→`) — move by word
+* `Backspace` / `Delete` — delete left/right
+* `Option+Backspace` (or `Ctrl+W`) — delete previous word
+* `Cmd+Backspace` (or `Ctrl+U`) — delete to start of line
+* `Ctrl+K` — delete to end of line
 
 Example in Today view:
 
@@ -300,7 +332,7 @@ While typing in search mode, the TUI provides inline autocomplete suggestions fo
 
 * Autocomplete activates automatically as you type.
 * When typing a partial filter key (e.g., `bu`), suggestions appear for matching keys (e.g., `bucket:`).
-* After typing a colon (e.g., `bucket:`), suggestions appear for valid values (e.g., `today`, `upcoming`, `anytime`, `someday`).
+* After typing a colon (e.g., `bucket:`), suggestions appear for valid values (e.g., `now`, `today`, `upcoming`, `anytime`, `someday`).
 
 #### 5.3.2. Autocomplete navigation
 
@@ -314,7 +346,7 @@ While typing in search mode, the TUI provides inline autocomplete suggestions fo
 
 Available filter keys:
 * `status:` – Task completion status (open, done, all)
-* `bucket:` – Planning bucket (today, upcoming, anytime, someday)
+* `bucket:` – Planning bucket (now, today, upcoming, anytime, someday)
 * `energy:` – Energy level (high, normal, low)
 * `priority:` – Priority level (high, normal, low)
 * `project:` – Project ID (dynamic, from task index)
@@ -352,10 +384,11 @@ After typing `bucket:`:
 ```text
 Search (scope: view): bucket:█
 ────────────────────────
-▶ today          Today's focus
+▶ now            Working on right now
+  today          Today's focus
   upcoming       Next up
   anytime        Flexible timing
-  someday        Future ideas
+  ...
 ```
 
 * Selected suggestion is highlighted (reverse video or accent background).
@@ -382,7 +415,7 @@ The top bar’s “Query” section shows:
 * E.g. in search:
 
  ```text
- View: Today (1) | Query: status:open bucket:today text:stripe priority:high | Flags: hide-done
+ View: Today (2) | Query: status:open bucket:today text:stripe priority:high | Flags: hide-done
  ```
 
 ---
@@ -476,6 +509,7 @@ Popup:
 ```text
 Set bucket for: Draft welcome email
 
+ [n] now
  [t] today
  [u] upcoming
  [a] anytime
@@ -487,15 +521,25 @@ Set bucket for: Draft welcome email
 
 Effects:
 
+* `n` → `bucket:now`.
 * `t` → `bucket:today`, and if `plan` empty, set `plan:<today>`.
 * `u` → `bucket:upcoming`.
 * `a` → `bucket:anytime`.
 * `s` → `bucket:someday`.
 * `c` → remove `bucket`.
 
-### 7.4. Plan date mini menu
+### 7.3b. Toggle “now” bucket (quick)
 
 * Key: `n`
+
+Behavior:
+
+* If `bucket` is `now`, clear it.
+* Otherwise set `bucket:now`.
+
+### 7.4. Plan date mini menu
+
+* Key: `t`
 
 Popup:
 
@@ -559,6 +603,7 @@ Key rules (consistent with search-style autocomplete):
   - `Shift+Tab` goes to the previous field (best-effort; depends on terminal key mapping)
   - `Enter` goes to the next field (or saves on the final field)
   - `↑/↓` moves focus between fields
+  - `←/→`, `Home/End`, `Option+←/→`, `Backspace/Delete` work within the active field (same as search bar)
 
 Later (optional): support `$EDITOR` integration.
 
@@ -577,6 +622,7 @@ Project targeting (must be explicit to the user):
   3. Otherwise, default to the selected task’s project.
   4. Otherwise, fall back to Inbox (`interactive.defaultProject`, default `"inbox"`).
 * The Project field is prefilled by the rules above, but the modal always starts focused on Project so it’s easy to confirm/change.
+* When a project is selected, the Project field displays `projectId — project name`.
 
 Flow:
 
@@ -596,6 +642,7 @@ Key rules:
   - `Shift+Tab` goes to the previous field (best-effort; depends on terminal key mapping)
   - `Enter` goes to the next field (or saves on the final field)
   - `↑/↓` moves focus between fields
+  - `←/→`, `Home/End`, `Option+←/→`, `Backspace/Delete` work within the active field (same as search bar)
 
 Result:
 

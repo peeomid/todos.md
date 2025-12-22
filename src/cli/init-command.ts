@@ -89,9 +89,10 @@ function runInit(options: InitOptions): void {
 
   if (withIndex) {
     const index: TaskIndex = {
-      version: 1,
+      version: 2,
       generatedAt: new Date().toISOString(),
       files: [file],
+      areas: {},
       projects: {},
       tasks: {},
     };
@@ -147,4 +148,3 @@ function runInit(options: InitOptions): void {
   console.log('  pnpm tmd list --json');
   console.log('  pnpm tmd sync');
 }
-

@@ -32,7 +32,7 @@
 - Added LintFix interface and optional fix() method to LintRule
 - Updated help.ts with all new commands
 - Drafted spec for `tmd init` command (workspace scaffolding, default config, starter view, quickstart checklist)
-- Implemented `tmd interactive` / `tmd i` full-screen TUI (2025-12-19): views 0–5 + config views, live search, task editing, `mtime` safety, reindex+sync on exit
+- Implemented `tmd interactive` / `tmd i` full-screen TUI (2025-12-19): views 0–6 + config views, live search, task editing, `mtime` safety, reindex+sync on exit
 - Extracted shared query logic to `src/query/filters.ts` and extended sorting for TUI (stable multi-sort, includes plan)
 - Extended date parsing to support `+Nd` and `+Nw` shortcuts (used by TUI and `tmd add`)
 - Updated TUI task lists to group by project (all views) and improved color styling for task text vs metadata (2025-12-19)
@@ -49,3 +49,10 @@
 - TUI reliability: avoid “Working…” freezes by allowing quit while busy and catching async key-handler errors (2025-12-19)
 - TUI: search autocomplete fixes — panel space reserved + `bucket:` key completion keeps cursor after colon (2025-12-20)
 - TUI: consistent input field UX — visible cursor + bracketed input field in search, promptText, and project picker (2025-12-20)
+- TUI: editable input cursor + word/line shortcuts across fields; add modal shows `projectId — project name` for selected project (2025-12-20)
+- TUI: added `bucket:now` (“working on right now”), built-in `Now` view (`1`), `n` toggle for now, plan key moved to `t`, and `*`/`@now` enrich shorthands (2025-12-22)
+- Index: schema v2 adds `areas` (area-only headings) and `projects[].parentArea` for grouping/inheritance (2025-12-22)
+- TUI: task list now groups by area heading → project → tasks when present (e.g. `# Work [area:work]`), only when there are matching tasks in the current view (2025-12-22)
+- TUI: task list upgrades — row numbers, `:` go-to-line, and fold/unfold area/project headers and task subtrees with Enter (2025-12-22)
+- TUI: Projects view is type-to-filter by default (arrow-only navigation); add project is `Ctrl+N` (2025-12-22)
+- TUI: help overlay readability upgrades — colored section headers and vim/arrow scrolling (2025-12-22)

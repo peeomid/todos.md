@@ -246,15 +246,26 @@ When adding a new task:
 
 ```typescript
 interface TaskIndex {
-  version: 1;
+  version: 2;
   generatedAt: string;           // ISO timestamp
   files: string[];               // List of source files
+
+  areas: {
+    [area: string]: {
+      area: string;              // "work"
+      name: string;              // Heading text (e.g. "Work")
+      filePath: string;
+      lineNumber: number;
+      headingLevel: number;
+    };
+  };
 
   projects: {
     [projectId: string]: {
       id: string;
       name: string;
       area?: string;
+      parentArea?: string;       // Nearest area-only heading above the project (if any)
       filePath: string;
       lineNumber: number;
     };

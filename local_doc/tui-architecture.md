@@ -36,9 +36,9 @@ The TUI keeps one `SessionState` (in `src/tui/interactive.ts`) containing:
 - Query state:
   - `query`: the currently active query string (persists after search is applied)
   - `statusMode`: `open` vs `all` (implemented as query rewrite to `status:open|all`)
-  - `search`: `{ active, scope, input }`
+  - `search`: `{ active, scope, input: { value, cursor } }`
     - `active` enables “live filtering as you type”
-    - `Enter` applies `search.input` into `query` and exits search
+    - `Enter` applies `search.input.value` into `query` and exits search
     - `Esc` cancels search edits (keeps previous `query`)
 - Selection state: `selection.{row,scroll,selectedId}`
 - Derived render lists: `filteredTasks`, `renderRows` (headers + tasks), `filteredProjects`
@@ -53,7 +53,7 @@ The TUI shares the same filter semantics as `tmd list` via `src/query/filters.ts
 Filtering pipeline (in `recompute()`):
 
 1. Choose the active query string:
-   - If searching: use `search.input`
+   - If searching: use `search.input.value`
    - Otherwise: use `state.query`
 2. Normalize status token based on `statusMode` (`status:open` or `status:all`).
 3. Tokenize by whitespace.

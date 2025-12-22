@@ -51,6 +51,11 @@ export function renderLabeledInputField(
   options: {
     label: string;
     value: string;
+    /**
+     * Cursor position measured in Unicode codepoints (i.e. `Array.from(value)` index).
+     * If omitted, cursor is treated as being at the end of `value`.
+     */
+    cursorIndex?: number;
     width: number;
     colorsDisabled: boolean;
     placeholder?: string;
@@ -63,6 +68,7 @@ export function renderLabeledInputField(
   const colorsDisabled = options.colorsDisabled;
   const width = options.width;
   const focused = options.focused ?? true;
+  const cursorIndexRaw = options.cursorIndex;
 
   const dim = dimOrPlain(term, colorsDisabled);
   const field = fieldOrPlain(term, colorsDisabled);
@@ -127,14 +133,58 @@ export function renderLabeledInputField(
     dim(']');
     return { cursorCol: Math.min(width, cursorBaseCol) };
   } else {
-    const shown = truncateStartByWidth(value, valueBudget);
-    const shownWidth = terminalKit.stringWidth(shown);
-    const remaining = Math.max(0, fieldWidth - shownWidth - cursorWidth);
-    if (shown) field(shown);
+    const chars = Array.from(value);
+    const cursorIndex = Math.max(0, Math.min(cursorIndexRaw ?? chars.length, chars.length));
+
+    const leftChars = chars.slice(0, cursorIndex);
+    const rightChars = chars.slice(cursorIndex);
+
+    const widthOf = (s: string) => terminalKit.stringWidth(s);
+    const takeTailByWidth = (xs: string[], maxWidth: number): string => {
+      if (maxWidth <= 0) return '';
+      let width = 0;
+      const out: string[] = [];
+      for (let idx = xs.length - 1; idx >= 0; idx--) {
+        const ch = xs[idx]!;
+        const w = terminalKit.stringWidth(ch);
+        if (width + w > maxWidth) break;
+        out.push(ch);
+        width += w;
+      }
+      return out.reverse().join('');
+    };
+    const takeHeadByWidth = (xs: string[], maxWidth: number): string => {
+      if (maxWidth <= 0) return '';
+      let width = 0;
+      const out: string[] = [];
+      for (let idx = 0; idx < xs.length; idx++) {
+        const ch = xs[idx]!;
+        const w = terminalKit.stringWidth(ch);
+        if (width + w > maxWidth) break;
+        out.push(ch);
+        width += w;
+      }
+      return out.join('');
+    };
+
+    const desiredLeft = Math.floor(valueBudget / 2);
+    let leftShown = takeTailByWidth(leftChars, desiredLeft);
+    let rightShown = takeHeadByWidth(rightChars, valueBudget - widthOf(leftShown));
+
+    // If one side is short, give the remaining space to the other side.
+    leftShown = takeTailByWidth(leftChars, valueBudget - widthOf(rightShown));
+    rightShown = takeHeadByWidth(rightChars, valueBudget - widthOf(leftShown));
+
+    const leftWidth = widthOf(leftShown);
+    const rightWidth = widthOf(rightShown);
+    const remaining = Math.max(0, fieldWidth - leftWidth - cursorWidth - rightWidth);
+
+    if (leftShown) field(leftShown);
     cursor(cursorToken);
+    if (rightShown) field(rightShown);
     if (remaining > 0) field(' '.repeat(remaining));
 
     dim(']');
-    return { cursorCol: Math.min(width, cursorBaseCol + shownWidth) };
+    return { cursorCol: Math.min(width, cursorBaseCol + leftWidth) };
   }
 }

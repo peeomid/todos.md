@@ -215,6 +215,30 @@ Default sort within bucket views:
 
 ---
 
+## 2025-12-22: TUI Area Headings + Folding + Index Schema v2
+
+### Overview
+- Task lists in `tmd interactive` can now render **area-only headings** (e.g. `# Work [area:work]`) above their nested projects, in every view.
+- Area headers only render when there is at least one matching task in the current view (no empty area sections).
+- Added folding/unfolding via `Enter` for:
+  - area headers
+  - project headers
+  - tasks with subtasks (hides all descendants)
+- Projects view is “type-to-filter” by default; adding a project is now `Ctrl+N` (so typing never triggers create).
+
+### Index Schema Changes
+- Bumped `todos.json` schema version to `2`.
+- Added `areas` to the index (keyed by area id, stores heading text + location).
+- Added `parentArea` to projects to capture nearest area-only heading above a project heading (used for UI grouping and area inheritance).
+
+### Files Updated
+- `tui_specs.md`
+- `tui.md`
+- `tui_implementation_details.md`
+- `cli-architecture.md`
+
+---
+
 ## 2025-12-19: TUI Shorthand Help Overlay (`?`)
 
 ### Overview
@@ -286,3 +310,45 @@ Default sort within bucket views:
 - `src/tui/layout.ts`
 - `src/tui/input-render.ts`
 - `src/tui/prompts.ts`
+
+---
+
+## 2025-12-20: TUI Cursor Editing + Project Field Display
+
+### Overview
+- Input fields (search + add/edit modals + prompts) now support cursor movement and mid-string editing, including word/line navigation and word/line deletion (best-effort across terminals; macOS Option/Cmd patterns supported where possible).
+- Add-task modal: when a project is selected, the Project field displays `projectId — project name` (instead of only the id).
+- Projects view: project rows display aligned `id — name` and no longer show file paths.
+
+### Files Updated
+- `tui.md`
+- `tui_specs.md`
+- `tui-architecture.md`
+- `tui_implementation_details.md`
+- `src/tui/input-render.ts`
+- `src/tui/interactive.ts`
+- `src/tui/prompts.ts`
+- `src/tui/text-input.ts`
+
+---
+
+## 2025-12-22: TUI “Now” Bucket + Rekeyed Views
+
+### Overview
+- Added `bucket:now` for “working on right now”.
+- Built-in view keys are now: `0` All, `1` Now, `2` Today, `3` Upcoming, `4` Anytime, `5` Someday, `6` Projects.
+- Keybindings:
+  - `n` toggles `bucket:now` on the selected task.
+  - Plan menu moved from `n` to `t`.
+- Shorthands:
+  - `*` (symbol) and `@now` map to `bucket:now` via `tmd enrich`.
+
+### Files Updated
+- `tui.md`
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `todo-format-spec.md`
+- `commands/11-enrich.md`
+- `commands/14-block-template.md`
+- `src/tui/interactive.ts`
+- `src/enricher/shorthand-parser.ts`

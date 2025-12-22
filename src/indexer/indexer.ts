@@ -1,8 +1,15 @@
-import type { TaskIndex, Task, Project } from '../schema/index.js';
-import { parseMarkdownFile, buildHierarchy, type TaskWithHierarchy, type ParsedProject } from '../parser/index.js';
+import type { AreaHeading, TaskIndex, Task, Project } from '../schema/index.js';
+import {
+  parseMarkdownFile,
+  buildHierarchy,
+  type TaskWithHierarchy,
+  type ParsedProject,
+  type ParsedAreaHeading,
+} from '../parser/index.js';
 import type { IndexerResult, IndexStats, IndexWarning } from './types.js';
 
 export function buildIndex(filePaths: string[]): IndexerResult {
+  const areas: Record<string, AreaHeading> = {};
   const projects: Record<string, Project> = {};
   const tasks: Record<string, Task> = {};
   const warnings: IndexWarning[] = [];
@@ -15,6 +22,13 @@ export function buildIndex(filePaths: string[]): IndexerResult {
     const parsed = parseMarkdownFile(filePath);
     const tasksWithHierarchy = buildHierarchy(parsed);
 
+    // Add area headings (for grouping + inherited area context)
+    for (const h of parsed.areaHeadings) {
+      if (!areas[h.area]) {
+        areas[h.area] = areaHeadingFromParsed(h);
+      }
+    }
+
     // Add projects
     for (const project of parsed.projects) {
       if (projects[project.id]) {
@@ -24,7 +38,8 @@ export function buildIndex(filePaths: string[]): IndexerResult {
           message: `Duplicate project ID '${project.id}'`,
         });
       }
-      projects[project.id] = projectFromParsed(project);
+      const parentArea = findParentAreaForProject(project, parsed.areaHeadings);
+      projects[project.id] = projectFromParsed(project, parentArea);
     }
 
     // Add tasks
@@ -84,9 +99,10 @@ export function buildIndex(filePaths: string[]): IndexerResult {
   }
 
   const index: TaskIndex = {
-    version: 1,
+    version: 2,
     generatedAt: new Date().toISOString(),
     files: filePaths,
+    areas,
     projects,
     tasks,
   };
@@ -104,11 +120,32 @@ export function buildIndex(filePaths: string[]): IndexerResult {
   return { index, stats, warnings };
 }
 
-function projectFromParsed(parsed: ParsedProject): Project {
+function findParentAreaForProject(project: ParsedProject, areaHeadings: ParsedAreaHeading[]): string | undefined {
+  if (areaHeadings.length === 0) return undefined;
+  const candidates = areaHeadings
+    .filter((h) => h.filePath === project.filePath)
+    .filter((h) => h.lineNumber < project.lineNumber)
+    .filter((h) => h.headingLevel < project.headingLevel)
+    .sort((a, b) => b.lineNumber - a.lineNumber);
+  return candidates[0]?.area;
+}
+
+function areaHeadingFromParsed(parsed: ParsedAreaHeading): AreaHeading {
+  return {
+    area: parsed.area,
+    name: parsed.name,
+    filePath: parsed.filePath,
+    lineNumber: parsed.lineNumber,
+    headingLevel: parsed.headingLevel,
+  };
+}
+
+function projectFromParsed(parsed: ParsedProject, parentArea: string | undefined): Project {
   return {
     id: parsed.id,
     name: parsed.name,
-    area: parsed.area,
+    area: parsed.area ?? parentArea,
+    parentArea,
     filePath: parsed.filePath,
     lineNumber: parsed.lineNumber,
   };

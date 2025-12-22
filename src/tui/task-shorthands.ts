@@ -10,6 +10,7 @@ export function formatPriorityShorthand(priority: Priority | undefined): string 
 }
 
 export function formatBucketSymbolShorthand(bucket: string | undefined): string {
+  if (bucket === 'now') return '*';
   if (bucket === 'today') return '!';
   if (bucket === 'upcoming') return '>';
   if (bucket === 'anytime') return '~';
@@ -18,6 +19,7 @@ export function formatBucketSymbolShorthand(bucket: string | undefined): string 
 }
 
 export function formatBucketTagShorthand(bucket: string | undefined): string {
+  if (bucket === 'now') return '@now';
   if (bucket === 'today') return '@today';
   if (bucket === 'upcoming') return '@upcoming';
   if (bucket === 'anytime') return '@anytime';

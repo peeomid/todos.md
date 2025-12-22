@@ -15,6 +15,7 @@ describe('task shorthands', () => {
   });
 
   it('formats bucket symbol shorthands', () => {
+    expect(formatBucketSymbolShorthand('now')).toBe('*');
     expect(formatBucketSymbolShorthand('today')).toBe('!');
     expect(formatBucketSymbolShorthand('upcoming')).toBe('>');
     expect(formatBucketSymbolShorthand('anytime')).toBe('~');
@@ -24,6 +25,7 @@ describe('task shorthands', () => {
   });
 
   it('formats bucket tag shorthands', () => {
+    expect(formatBucketTagShorthand('now')).toBe('@now');
     expect(formatBucketTagShorthand('today')).toBe('@today');
     expect(formatBucketTagShorthand('upcoming')).toBe('@upcoming');
     expect(formatBucketTagShorthand('anytime')).toBe('@anytime');

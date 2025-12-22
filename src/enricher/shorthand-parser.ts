@@ -9,6 +9,7 @@ const PRIORITY_SHORTCUTS: Record<string, 'high' | 'normal' | 'low'> = {
 
 // Symbol shorthands at start of task text (after optional priority)
 const SYMBOL_SHORTCUTS: Record<string, { bucket: string; setsPlan: boolean }> = {
+  '*': { bucket: 'now', setsPlan: false },
   '!': { bucket: 'today', setsPlan: true },
   '>': { bucket: 'upcoming', setsPlan: false },
   '~': { bucket: 'anytime', setsPlan: false },
@@ -17,6 +18,7 @@ const SYMBOL_SHORTCUTS: Record<string, { bucket: string; setsPlan: boolean }> = 
 
 // @tag shorthands in task text
 const AT_TAG_SHORTCUTS: Record<string, { bucket: string; setsPlan: boolean }> = {
+  '@now': { bucket: 'now', setsPlan: false },
   '@today': { bucket: 'today', setsPlan: true },
   '@upcoming': { bucket: 'upcoming', setsPlan: false },
   '@anytime': { bucket: 'anytime', setsPlan: false },
@@ -24,8 +26,8 @@ const AT_TAG_SHORTCUTS: Record<string, { bucket: string; setsPlan: boolean }> = 
 };
 
 const PRIORITY_REGEX = /^\(([ABC])\)\s*/;
-const SYMBOL_REGEX = /^([!>~?])\s+/;
-const AT_TAG_REGEX = /\s*(@today|@upcoming|@anytime|@someday)\s*/g;
+const SYMBOL_REGEX = /^([*!>~?])\s+/;
+const AT_TAG_REGEX = /\s*(@now|@today|@upcoming|@anytime|@someday)\s*/g;
 
 /**
  * Parse shorthands from task text and return canonical values.

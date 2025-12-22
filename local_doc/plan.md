@@ -103,7 +103,8 @@ Recent spec changes implemented:
 
 ## Phase 8: Interactive TUI [DONE]
 - [x] `tmd interactive` command + `tmd i` alias
-- [x] Built-in views `0–5` + custom views via config (`interactive.views[]`)
+- [x] Built-in views `0–6` + custom views via config (`interactive.views[]`)
+- [x] Added `bucket:now` (“working on right now”) + built-in `Now` view (`1`) + `n` toggle; moved plan hotkey to `t`; enrich supports `*`/`@now` shorthands
 - [x] Live search (`/`) with scope toggle, and `z` show/hide done query rewrite
 - [x] Search UX: `/` prefill includes trailing space; plain words behave like `text:`; `Enter` applies query; `Esc` cancels
 - [x] Task actions: toggle done (with cascade), priority/bucket/plan/due menus, inline edit, add flow
@@ -117,11 +118,15 @@ Recent spec changes implemented:
 - [x] TUI: footer always shows details + help, with separators
 - [x] TUI: active view tab highlighted in header
 - [x] TUI: double-`Ctrl+C` quits (first press shows a prompt)
-- [x] TUI: in Projects view, `[a]` adds a new project and auto-switches into that project’s drilldown view
+- [x] TUI: in Projects view, `Ctrl+N` adds a new project and auto-switches into that project’s drilldown view
 - [x] TUI: redesigned `e`/`a` into multi-field modals (Text/Meta and Project/Text/Meta) with shared autocomplete UI and consistent key semantics
 - [x] TUI: add-project flow uses current file (no file picker), auto heading level, and starts at project name prompt
 - [x] TUI: key menus show an explicit “press key to choose” hint in the footer (e.g. `[1-9] choose`, `[h/n/l] choose`)
 - [x] `tmd interactive`: allow selecting input/output via flags (`--file/--input`, `--output/--out`)
+- [x] TUI: task list row numbers + `:` go-to-line
+- [x] TUI: fold/unfold area headers, project headers, and task subtrees with Enter
+- [x] TUI: Projects view is type-to-filter by default (arrow-only navigation; add project is `Ctrl+N`)
+- [x] TUI: show area-only headings (e.g. `# Work [area:work]`) above nested projects when there are matching tasks in the current view
 
 ## Next Steps
 - [ ] `tmd init` - scaffold workspace (todos.md, config defaults, daily view, quickstart output)

@@ -35,6 +35,7 @@ tmd block-template <preset|query> [options]
 
 | Preset | Query | Description |
 |--------|-------|-------------|
+| `now` | `status:open bucket:now` | Working right now |
 | `today` | `status:open bucket:today` | Today's focus tasks |
 | `upcoming` | `status:open bucket:upcoming` | Upcoming tasks |
 | `anytime` | `status:open bucket:anytime` | Flexible tasks |

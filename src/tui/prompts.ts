@@ -1,6 +1,7 @@
 import { setCursorVisible } from './term-cursor.js';
 import { isSpaceKeyName } from './key-utils.js';
 import { renderLabeledInputField } from './input-render.js';
+import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor, type TextInputState } from './text-input.js';
 import {
   getAutocompleteContext,
   generateSuggestionsWithSpecs,
@@ -56,6 +57,83 @@ function dimOrPlain(term: Term, colorsDisabled: boolean): (s: string) => void {
   if (colorsDisabled) return (s: string) => term(s);
   if (typeof term.dim === 'function') return (s: string) => term.dim(s);
   return (s: string) => term(s);
+}
+
+function isSectionHeaderLine(line: string): boolean {
+  const trimmed = (line ?? '').trim();
+  if (!trimmed) return false;
+  return /^[A-Za-z].*:\s*$/.test(trimmed);
+}
+
+function writeStyledHelpLine(term: Term, line: string, width: number, colorsDisabled: boolean): void {
+  const raw = line ?? '';
+  if (colorsDisabled) {
+    term(terminalKit.truncateString(raw, width));
+    return;
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    term('');
+    return;
+  }
+
+  // Top-level title-ish lines
+  if (trimmed === 'Keybindings:' || trimmed === 'Row shorthands (visual hints in the task list):') {
+    term.bold.yellow(terminalKit.truncateString(raw, width));
+    return;
+  }
+
+  // Section headers like "Navigation:" / "Search:" etc.
+  if (isSectionHeaderLine(raw)) {
+    term.bold.cyan(terminalKit.truncateString(raw, width));
+    return;
+  }
+
+  // Notes/bullets
+  if (/^\s*-\s+/.test(raw)) {
+    term.dim(terminalKit.truncateString(raw, width));
+    return;
+  }
+
+  const indentMatch = raw.match(/^(\s*)(.*)$/);
+  const indent = indentMatch?.[1] ?? '';
+  const rest = indentMatch?.[2] ?? '';
+
+  const eqIndex = rest.indexOf(' = ');
+  if (eqIndex !== -1) {
+    const left = rest.slice(0, eqIndex);
+    const right = rest.slice(eqIndex + 3);
+    const text = `${indent}${left} = ${right}`;
+    const truncated = terminalKit.truncateString(text, width);
+
+    // Re-split after truncation so widths match what's printed.
+    const tIndentMatch = truncated.match(/^(\s*)(.*)$/);
+    const tIndent = tIndentMatch?.[1] ?? '';
+    const tRest = tIndentMatch?.[2] ?? '';
+    const tEqIndex = tRest.indexOf(' = ');
+    if (tEqIndex === -1) {
+      term(truncated);
+      return;
+    }
+    const tLeft = tRest.slice(0, tEqIndex);
+    const tRight = tRest.slice(tEqIndex + 3);
+
+    term.dim(tIndent);
+    term.bold.yellow(tLeft);
+    term.dim(' = ');
+    term(tRight);
+    return;
+  }
+
+  // Default: light emphasis for key-like bracket chunks.
+  const truncated = terminalKit.truncateString(raw, width);
+  const parts = truncated.split(/(\[[^\]]+\])/g);
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.startsWith('[') && part.endsWith(']')) term.bold.yellow(part);
+    else term(part);
+  }
 }
 
 function stripBracketedMetadata(block: string): string {
@@ -147,11 +225,11 @@ export async function showKeyMenu(
     const shown = lines.slice(scrollTop, scrollTop + contentMaxRows);
     for (let i = 0; i < shown.length; i++) {
       term.moveTo(1, contentTop + i);
-      term(terminalKit.truncateString(shown[i] ?? '', width));
+      writeStyledHelpLine(term, shown[i] ?? '', width, colorsDisabled);
     }
 
     const footerParts: string[] = [];
-    if (lines.length > contentMaxRows) footerParts.push('[↑/↓] scroll');
+    if (lines.length > contentMaxRows) footerParts.push('[j/k/↑/↓] scroll', '[Ctrl+U/D] page', '[g/G] top/bot');
     const choiceHint = formatChoiceHint();
     if (choiceHint) footerParts.push(choiceHint);
     if (options?.enter !== undefined) footerParts.push(allowed.length === 0 ? '[Enter] close' : '[Enter] default');
@@ -189,6 +267,16 @@ export async function showKeyMenu(
         render();
         return;
       }
+      if (name === 'k' && scrollTop > 0) {
+        scrollTop = Math.max(0, scrollTop - 1);
+        render();
+        return;
+      }
+      if (name === 'j' && scrollTop < maxScrollTop) {
+        scrollTop = Math.min(maxScrollTop, scrollTop + 1);
+        render();
+        return;
+      }
       if (name === 'PAGE_UP' && scrollTop > 0) {
         scrollTop = Math.max(0, scrollTop - Math.max(1, Math.floor(contentMaxRows / 2)));
         render();
@@ -199,12 +287,32 @@ export async function showKeyMenu(
         render();
         return;
       }
+      if (name === 'CTRL_U' && scrollTop > 0) {
+        scrollTop = Math.max(0, scrollTop - Math.max(1, Math.floor(contentMaxRows / 2)));
+        render();
+        return;
+      }
+      if (name === 'CTRL_D' && scrollTop < maxScrollTop) {
+        scrollTop = Math.min(maxScrollTop, scrollTop + Math.max(1, Math.floor(contentMaxRows / 2)));
+        render();
+        return;
+      }
       if (name === 'HOME' && scrollTop !== 0) {
         scrollTop = 0;
         render();
         return;
       }
       if (name === 'END' && scrollTop !== maxScrollTop) {
+        scrollTop = maxScrollTop;
+        render();
+        return;
+      }
+      if (name === 'g' && scrollTop !== 0) {
+        scrollTop = 0;
+        render();
+        return;
+      }
+      if (name === 'G' && scrollTop !== maxScrollTop) {
         scrollTop = maxScrollTop;
         render();
         return;
@@ -252,7 +360,7 @@ export async function promptText(
     });
   }
 
-  let value = initial ?? '';
+  let input = createTextInput(initial ?? '');
   const fieldLabel = fieldLabelFromPromptLabel(label);
 
   function render(): void {
@@ -269,7 +377,8 @@ export async function promptText(
     eraseLineAfterSafe(term);
     const { cursorCol } = renderLabeledInputField(term, {
       label: fieldLabel,
-      value,
+      value: input.value,
+      cursorIndex: input.cursor,
       width,
       colorsDisabled,
       placeholder: 'type…',
@@ -293,21 +402,12 @@ export async function promptText(
       if (name === 'ENTER') {
         term.removeListener('key', handler);
         setCursorVisible(term, false);
-        resolve(value);
+        resolve(input.value);
         return;
       }
-      if (name === 'BACKSPACE') {
-        value = value.slice(0, -1);
-        render();
-        return;
-      }
-      if (isSpaceKeyName(name)) {
-        value += ' ';
-        render();
-        return;
-      }
-      if (name.length === 1) {
-        value += name;
+      const applied = applyTextInputKey(input, name);
+      if (applied) {
+        input = applied.state;
         render();
         return;
       }
@@ -363,11 +463,11 @@ export async function pickProjectTypeahead(
   initialQuery: string,
   colorsDisabled: boolean
 ): Promise<string | null> {
-  let query = initialQuery;
+  let queryInput = createTextInput(initialQuery);
   let selected = 0;
 
   function filterProjects(): { id: string; name: string; area?: string }[] {
-    const q = query.trim().toLowerCase();
+    const q = queryInput.value.trim().toLowerCase();
     const scored = projects
       .map((p) => {
         const hay = `${p.id} ${p.name} ${p.area ?? ''}`.toLowerCase();
@@ -399,7 +499,8 @@ export async function pickProjectTypeahead(
     eraseLineAfterSafe(term);
     const { cursorCol } = renderLabeledInputField(term, {
       label: 'Project ',
-      value: query,
+      value: queryInput.value,
+      cursorIndex: queryInput.cursor,
       width,
       colorsDisabled,
       placeholder: 'type to filter…',
@@ -457,22 +558,10 @@ export async function pickProjectTypeahead(
         render();
         return;
       }
-      if (name === 'BACKSPACE') {
-        query = query.slice(0, -1);
-        selected = 0;
-        render();
-        return;
-      }
-      if (isSpaceKeyName(name)) {
-        query += ' ';
-        selected = 0;
-        render();
-        return;
-      }
-      // Basic text input (letters/digits/space and some punctuation)
-      if (name.length === 1) {
-        query += name;
-        selected = 0;
+      const applied = applyTextInputKey(queryInput, name);
+      if (applied) {
+        queryInput = applied.state;
+        if (applied.didChangeValue) selected = 0;
         render();
         return;
       }
@@ -491,8 +580,7 @@ export async function promptMetadataBlock(options: {
 }): Promise<string | null> {
   const { term, title, taskLine, initial, allTasks, colorsDisabled } = options;
 
-  let value = stripBracketedMetadata(initial);
-  let cursorPos = value.length;
+  let input = createTextInput(stripBracketedMetadata(initial));
 
   const autocomplete: AutocompleteState = {
     active: false,
@@ -502,7 +590,8 @@ export async function promptMetadataBlock(options: {
   };
 
   function updateAutocomplete(): void {
-    const context = getAutocompleteContext(value, cursorPos);
+    const cursorPosUnits = toCodeUnitCursor(input.value, input.cursor);
+    const context = getAutocompleteContext(input.value, cursorPosUnits);
     autocomplete.context = context;
     const suggestions = generateSuggestionsWithSpecs(context, allTasks, METADATA_SPECS as any);
     autocomplete.suggestions = suggestions;
@@ -533,7 +622,8 @@ export async function promptMetadataBlock(options: {
     eraseLineAfterSafe(term);
     const { cursorCol } = renderLabeledInputField(term, {
       label: 'Metadata ',
-      value,
+      value: input.value,
+      cursorIndex: input.cursor,
       width,
       colorsDisabled,
       placeholder: 'id:1 bucket:today plan:today',
@@ -545,7 +635,9 @@ export async function promptMetadataBlock(options: {
     term.moveTo(1, afterInputRow);
     eraseLineAfterSafe(term);
     try {
-      dimOrPlain(term, colorsDisabled)(terminalKit.truncateString(`Saved as: ${wrapMetadata(value) || '(empty)'}`, width));
+      dimOrPlain(term, colorsDisabled)(
+        terminalKit.truncateString(`Saved as: ${wrapMetadata(input.value) || '(empty)'}`, width)
+      );
     } catch {
       dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('Saved as: (invalid metadata)', width));
     }
@@ -581,7 +673,7 @@ export async function promptMetadataBlock(options: {
         term.removeListener('key', handler);
         setCursorVisible(term, false);
         try {
-          resolve(wrapMetadata(value));
+          resolve(wrapMetadata(input.value));
         } catch {
           // Stay in the prompt; user can fix input.
           setCursorVisible(term, true);
@@ -602,31 +694,17 @@ export async function promptMetadataBlock(options: {
       if (name === 'TAB' && autocomplete.active && autocomplete.context) {
         const suggestion = autocomplete.suggestions[autocomplete.selectedIndex];
         if (suggestion) {
-          const applied = applySuggestion(value, cursorPos, suggestion, autocomplete.context);
-          value = applied.newInput;
-          cursorPos = applied.newCursorPos;
+          const cursorPosUnits = toCodeUnitCursor(input.value, input.cursor);
+          const applied = applySuggestion(input.value, cursorPosUnits, suggestion, autocomplete.context);
+          input = { value: applied.newInput, cursor: toCodepointCursor(applied.newInput, applied.newCursorPos) };
           updateAutocomplete();
           render();
         }
         return;
       }
-      if (name === 'BACKSPACE') {
-        value = value.slice(0, -1);
-        cursorPos = value.length;
-        updateAutocomplete();
-        render();
-        return;
-      }
-      if (isSpaceKeyName(name)) {
-        value += ' ';
-        cursorPos = value.length;
-        updateAutocomplete();
-        render();
-        return;
-      }
-      if (name.length === 1) {
-        value += name;
-        cursorPos = value.length;
+      const applied = applyTextInputKey(input, name);
+      if (applied) {
+        input = applied.state;
         updateAutocomplete();
         render();
         return;
@@ -650,8 +728,8 @@ export async function promptEditTaskModal(options: {
   type Focus = 'text' | 'meta';
   let focus: Focus = 'text';
 
-  let textValue = initialText ?? '';
-  let metaValue = stripBracketedMetadata(initialMetadata ?? '');
+  let textInput = createTextInput(initialText ?? '');
+  let metaInput = createTextInput(stripBracketedMetadata(initialMetadata ?? ''));
   let message: string | null = null;
 
   const metaAutocomplete: AutocompleteState = {
@@ -663,8 +741,8 @@ export async function promptEditTaskModal(options: {
 
   function updateMetaAutocomplete(): void {
     if (focus !== 'meta') return;
-    const cursorPos = metaValue.length;
-    const context = getAutocompleteContext(metaValue, cursorPos);
+    const cursorPosUnits = toCodeUnitCursor(metaInput.value, metaInput.cursor);
+    const context = getAutocompleteContext(metaInput.value, cursorPosUnits);
     metaAutocomplete.context = context;
     if (!context.filterKey && !context.isAfterColon && context.currentToken === '') {
       clearMetaAutocomplete();
@@ -708,7 +786,8 @@ export async function promptEditTaskModal(options: {
     eraseLineAfterSafe(term);
     const textCursor = renderLabeledInputField(term, {
       label: focus === 'text' ? 'Text * ' : 'Text   ',
-      value: textValue,
+      value: textInput.value,
+      cursorIndex: textInput.cursor,
       width,
       colorsDisabled,
       placeholder: 'task description…',
@@ -721,7 +800,8 @@ export async function promptEditTaskModal(options: {
     eraseLineAfterSafe(term);
     const metaCursor = renderLabeledInputField(term, {
       label: focus === 'meta' ? 'Meta * ' : 'Meta   ',
-      value: metaValue,
+      value: metaInput.value,
+      cursorIndex: metaInput.cursor,
       width,
       colorsDisabled,
       placeholder: 'id:1 bucket:today plan:today',
@@ -803,9 +883,9 @@ export async function promptEditTaskModal(options: {
         if ((name === 'TAB' || name === 'ENTER') && metaAutocomplete.active && metaAutocomplete.context) {
           const suggestion = metaAutocomplete.suggestions[metaAutocomplete.selectedIndex];
           if (suggestion) {
-            const cursorPos = metaValue.length;
-            const applied = applySuggestion(metaValue, cursorPos, suggestion, metaAutocomplete.context);
-            metaValue = applied.newInput;
+            const cursorPosUnits = toCodeUnitCursor(metaInput.value, metaInput.cursor);
+            const applied = applySuggestion(metaInput.value, cursorPosUnits, suggestion, metaAutocomplete.context);
+            metaInput = { value: applied.newInput, cursor: toCodepointCursor(applied.newInput, applied.newCursorPos) };
             updateMetaAutocomplete();
             render();
           }
@@ -828,10 +908,10 @@ export async function promptEditTaskModal(options: {
         }
         if (name === 'ENTER' && !metaAutocomplete.active) {
           try {
-            const metadataBlock = wrapMetadata(metaValue);
+            const metadataBlock = wrapMetadata(metaInput.value);
             term.removeListener('key', handler);
             setCursorVisible(term, false);
-            resolve({ text: textValue, metadataBlock });
+            resolve({ text: textInput.value, metadataBlock });
           } catch (e) {
             message = e instanceof Error ? e.message : String(e);
             updateMetaAutocomplete();
@@ -839,20 +919,9 @@ export async function promptEditTaskModal(options: {
           }
           return;
         }
-        if (name === 'BACKSPACE') {
-          metaValue = metaValue.slice(0, -1);
-          updateMetaAutocomplete();
-          render();
-          return;
-        }
-        if (isSpaceKeyName(name)) {
-          metaValue += ' ';
-          updateMetaAutocomplete();
-          render();
-          return;
-        }
-        if (name.length === 1) {
-          metaValue += name;
+        const applied = applyTextInputKey(metaInput, name);
+        if (applied) {
+          metaInput = applied.state;
           updateMetaAutocomplete();
           render();
           return;
@@ -878,18 +947,9 @@ export async function promptEditTaskModal(options: {
           render();
           return;
         }
-        if (name === 'BACKSPACE') {
-          textValue = textValue.slice(0, -1);
-          render();
-          return;
-        }
-        if (isSpaceKeyName(name)) {
-          textValue += ' ';
-          render();
-          return;
-        }
-        if (name.length === 1) {
-          textValue += name;
+        const applied = applyTextInputKey(textInput, name);
+        if (applied) {
+          textInput = applied.state;
           render();
           return;
         }
@@ -915,12 +975,13 @@ export async function promptAddTaskModal(options: {
   let message: string | null = null;
 
   let projectSelected: string | null = initialProjectId ?? null;
-  let projectQuery: string = initialProjectId ?? '';
-  let textValue = '';
-  let metaValue = '';
+  let projectQueryInput: TextInputState = createTextInput(initialProjectId ?? '');
+  let textInput: TextInputState = createTextInput('');
+  let metaInput: TextInputState = createTextInput('');
 
   const projectList: AutocompleteState = { active: false, suggestions: [], selectedIndex: 0, context: null };
   const metaAutocomplete: AutocompleteState = { active: false, suggestions: [], selectedIndex: 0, context: null };
+  const projectById = new Map(projects.map((p) => [p.id, p] as const));
 
   function clearProjectList(): void {
     projectList.active = false;
@@ -947,7 +1008,7 @@ export async function promptAddTaskModal(options: {
       return;
     }
 
-    const q = projectQuery.trim().toLowerCase();
+    const q = projectQueryInput.value.trim().toLowerCase();
     const scored = projects
       .map((p) => {
         const hay = `${p.id} ${p.name} ${p.area ?? ''}`.toLowerCase();
@@ -975,8 +1036,8 @@ export async function promptAddTaskModal(options: {
       clearMetaAutocomplete();
       return;
     }
-    const cursorPos = metaValue.length;
-    const context = getAutocompleteContext(metaValue, cursorPos);
+    const cursorPosUnits = toCodeUnitCursor(metaInput.value, metaInput.cursor);
+    const context = getAutocompleteContext(metaInput.value, cursorPosUnits);
     metaAutocomplete.context = context;
     if (!context.filterKey && !context.isAfterColon && context.currentToken === '') {
       clearMetaAutocomplete();
@@ -998,14 +1059,15 @@ export async function promptAddTaskModal(options: {
 
     if (focus === 'project') {
       projectSelected = suggestion.text;
-      projectQuery = suggestion.text;
+      projectQueryInput = createTextInput(suggestion.text);
       clearProjectList();
       return true;
     }
 
     if (focus === 'meta' && metaAutocomplete.context) {
-      const applied = applySuggestion(metaValue, metaValue.length, suggestion, metaAutocomplete.context);
-      metaValue = applied.newInput;
+      const cursorPosUnits = toCodeUnitCursor(metaInput.value, metaInput.cursor);
+      const applied = applySuggestion(metaInput.value, cursorPosUnits, suggestion, metaAutocomplete.context);
+      metaInput = { value: applied.newInput, cursor: toCodepointCursor(applied.newInput, applied.newCursorPos) };
       updateMetaAutocomplete();
       return true;
     }
@@ -1031,7 +1093,7 @@ export async function promptAddTaskModal(options: {
       computeProjectSuggestions();
       return false;
     }
-    if (focus === 'text' && !textValue.trim()) {
+    if (focus === 'text' && !textInput.value.trim()) {
       message = 'Task text is required';
       return false;
     }
@@ -1064,9 +1126,17 @@ export async function promptAddTaskModal(options: {
 
     term.moveTo(1, projectRow);
     eraseLineAfterSafe(term);
+    const selectedProject = projectSelected ? projectById.get(projectSelected) : undefined;
+    const projectDisplay = projectSelected
+      ? selectedProject?.name
+        ? `${projectSelected} — ${selectedProject.name}`
+        : projectSelected
+      : projectQueryInput.value;
+    const projectCursorIndex = projectSelected ? Array.from(projectDisplay).length : projectQueryInput.cursor;
     const projectCursor = renderLabeledInputField(term, {
       label: focus === 'project' ? 'Project * ' : 'Project   ',
-      value: projectSelected ?? projectQuery,
+      value: projectDisplay,
+      cursorIndex: projectCursorIndex,
       width,
       colorsDisabled,
       placeholder: 'type to filter…',
@@ -1078,7 +1148,8 @@ export async function promptAddTaskModal(options: {
     eraseLineAfterSafe(term);
     const textCursor = renderLabeledInputField(term, {
       label: focus === 'text' ? 'Text * ' : 'Text   ',
-      value: textValue,
+      value: textInput.value,
+      cursorIndex: textInput.cursor,
       width,
       colorsDisabled,
       placeholder: 'task description…',
@@ -1090,7 +1161,8 @@ export async function promptAddTaskModal(options: {
     eraseLineAfterSafe(term);
     const metaCursor = renderLabeledInputField(term, {
       label: focus === 'meta' ? 'Meta * ' : 'Meta   ',
-      value: metaValue,
+      value: metaInput.value,
+      cursorIndex: metaInput.cursor,
       width,
       colorsDisabled,
       placeholder: 'bucket:today plan:today priority:high',
@@ -1111,7 +1183,7 @@ export async function promptAddTaskModal(options: {
     } else if (focus === 'meta') {
       try {
         dimOrPlain(term, colorsDisabled)(
-          terminalKit.truncateString(`Will save meta: ${wrapMetadata(metaValue) || '(none)'}`, width)
+          terminalKit.truncateString(`Will save meta: ${wrapMetadata(metaInput.value) || '(none)'}`, width)
         );
       } catch {
         dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('Meta is invalid', width));
@@ -1221,7 +1293,7 @@ export async function promptAddTaskModal(options: {
           return;
         }
         if (focus === 'text') {
-          if (!textValue.trim()) {
+          if (!textInput.value.trim()) {
             message = 'Task text is required';
             render();
             return;
@@ -1238,7 +1310,7 @@ export async function promptAddTaskModal(options: {
             render();
             return;
           }
-          const trimmedText = textValue.trim();
+          const trimmedText = textInput.value.trim();
           if (!trimmedText) {
             message = 'Task text is required';
             focus = 'text';
@@ -1246,7 +1318,7 @@ export async function promptAddTaskModal(options: {
             return;
           }
           try {
-            wrapMetadata(metaValue); // validate
+            wrapMetadata(metaInput.value); // validate
           } catch (e) {
             message = e instanceof Error ? e.message : String(e);
             updateMetaAutocomplete();
@@ -1255,7 +1327,7 @@ export async function promptAddTaskModal(options: {
           }
           term.removeListener('key', handler);
           setCursorVisible(term, false);
-          resolve({ projectId: projectSelected, text: trimmedText, metadataInner: metaValue.trim() });
+          resolve({ projectId: projectSelected, text: trimmedText, metadataInner: metaInput.value.trim() });
           return;
         }
       }
@@ -1263,36 +1335,30 @@ export async function promptAddTaskModal(options: {
       if (focus === 'project') {
         if (projectSelected) {
           // Any edit action clears selection and enters filter mode.
-          if (name === 'BACKSPACE') {
-            projectSelected = null;
-            projectQuery = '';
-            computeProjectSuggestions();
-            render();
-            return;
-          }
-          if (isSpaceKeyName(name) || name.length === 1) {
-            projectSelected = null;
-            projectQuery = '';
-            // fall through to apply this key to query
-          } else {
-            return;
-          }
+          const isEditKey =
+            name === 'BACKSPACE' ||
+            name === 'DELETE' ||
+            name === 'DEL' ||
+            name === 'CTRL_D' ||
+            name === 'ALT_BACKSPACE' ||
+            name === 'META_BACKSPACE' ||
+            name === 'CTRL_W' ||
+            name === 'CTRL_U' ||
+            name === 'CMD_BACKSPACE' ||
+            name === 'CTRL_K' ||
+            isSpaceKeyName(name) ||
+            name.length === 1;
+
+          if (!isEditKey) return;
+
+          projectSelected = null;
+          projectQueryInput = createTextInput('');
         }
 
-        if (name === 'BACKSPACE') {
-          projectQuery = projectQuery.slice(0, -1);
-          computeProjectSuggestions();
-          render();
-          return;
-        }
-        if (isSpaceKeyName(name)) {
-          projectQuery += ' ';
-          computeProjectSuggestions();
-          render();
-          return;
-        }
-        if (name.length === 1) {
-          projectQuery += name;
+        const applied = applyTextInputKey(projectQueryInput, name);
+        if (applied) {
+          projectQueryInput = applied.state;
+          if (applied.didChangeValue) projectList.selectedIndex = 0;
           computeProjectSuggestions();
           render();
           return;
@@ -1301,18 +1367,9 @@ export async function promptAddTaskModal(options: {
       }
 
       if (focus === 'text') {
-        if (name === 'BACKSPACE') {
-          textValue = textValue.slice(0, -1);
-          render();
-          return;
-        }
-        if (isSpaceKeyName(name)) {
-          textValue += ' ';
-          render();
-          return;
-        }
-        if (name.length === 1) {
-          textValue += name;
+        const applied = applyTextInputKey(textInput, name);
+        if (applied) {
+          textInput = applied.state;
           render();
           return;
         }
@@ -1320,20 +1377,9 @@ export async function promptAddTaskModal(options: {
       }
 
       if (focus === 'meta') {
-        if (name === 'BACKSPACE') {
-          metaValue = metaValue.slice(0, -1);
-          updateMetaAutocomplete();
-          render();
-          return;
-        }
-        if (isSpaceKeyName(name)) {
-          metaValue += ' ';
-          updateMetaAutocomplete();
-          render();
-          return;
-        }
-        if (name.length === 1) {
-          metaValue += name;
+        const applied = applyTextInputKey(metaInput, name);
+        if (applied) {
+          metaInput = applied.state;
           updateMetaAutocomplete();
           render();
           return;

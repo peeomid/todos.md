@@ -67,12 +67,13 @@ Look immediately after `- [ ]`/`- [x]` for priority marker:
 | `(B)` | `priority:normal` |
 | `(C)` | `priority:low` |
 
-**Step 2 – Bucket shorthand symbols `!`/`>`/`~`/`?`**
+**Step 2 – Bucket shorthand symbols `*`/`!`/`>`/`~`/`?`**
 
 Look for bucket symbol after optional priority:
 
 | Symbol | Converts To |
 |--------|-------------|
+| `*` | `bucket:now` |
 | `!` | `bucket:today` + `plan:YYYY-MM-DD` (today's date) |
 | `>` | `bucket:upcoming` |
 | `~` | `bucket:anytime` |
@@ -84,6 +85,7 @@ Scan task text for @tags:
 
 | Shorthand | Converts To |
 |-----------|-------------|
+| `@now` | `bucket:now` |
 | `@today` | `bucket:today` + `plan:YYYY-MM-DD` (today's date) |
 | `@upcoming` | `bucket:upcoming` |
 | `@anytime` | `bucket:anytime` |

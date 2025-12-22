@@ -8,6 +8,15 @@ export interface ParsedProject {
   metadata: Record<string, string>;
 }
 
+export interface ParsedAreaHeading {
+  area: string;
+  name: string;
+  filePath: string;
+  lineNumber: number;
+  headingLevel: number;
+  metadata: Record<string, string>;
+}
+
 export interface ParsedTask {
   localId: string | null;
   text: string;
@@ -23,6 +32,7 @@ export interface ParsedFile {
   filePath: string;
   formatVersion?: number;
   projects: ParsedProject[];
+  areaHeadings: ParsedAreaHeading[];
   tasks: ParsedTask[];
 }
 

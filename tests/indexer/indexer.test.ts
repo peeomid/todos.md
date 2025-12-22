@@ -28,7 +28,7 @@ describe('buildIndex', () => {
 
     const { index, stats } = buildIndex([TEST_FILE]);
 
-    expect(index.version).toBe(1);
+    expect(index.version).toBe(2);
     expect(Object.keys(index.projects)).toHaveLength(1);
     expect(Object.keys(index.tasks)).toHaveLength(2);
     expect(stats.tasks.total).toBe(2);
@@ -48,6 +48,25 @@ describe('buildIndex', () => {
 
     expect(index.tasks['myproj:1']).toBeDefined();
     expect(index.tasks['myproj:1']?.globalId).toBe('myproj:1');
+  });
+
+  it('indexes area-only headings and inherits area for nested projects', () => {
+    fs.writeFileSync(
+      TEST_FILE,
+      `# Work [area:work]
+
+## Project A [project:a]
+
+- [ ] Task [id:1]`
+    );
+
+    const { index } = buildIndex([TEST_FILE]);
+
+    expect(index.areas.work).toBeDefined();
+    expect(index.areas.work?.name).toBe('Work');
+    expect(index.projects.a?.area).toBe('work');
+    expect(index.projects.a?.parentArea).toBe('work');
+    expect(index.tasks['a:1']?.area).toBe('work');
   });
 
   it('warns on duplicate global IDs', () => {

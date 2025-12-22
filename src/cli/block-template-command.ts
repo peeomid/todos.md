@@ -12,6 +12,7 @@ interface BlockTemplateOptions {
 
 // Built-in presets
 const PRESETS: Record<string, { query: string; name: string }> = {
+  now: { query: 'status:open bucket:now', name: 'now' },
   today: { query: 'status:open bucket:today', name: 'today' },
   upcoming: { query: 'status:open bucket:upcoming', name: 'upcoming' },
   anytime: { query: 'status:open bucket:anytime', name: 'anytime' },
@@ -77,6 +78,7 @@ Arguments:
   <preset|query>        Built-in preset name OR custom query string
 
 Built-in Presets:
+  now         status:open bucket:now         Working right now
   today       status:open bucket:today       Today's focus tasks
   upcoming    status:open bucket:upcoming    Upcoming tasks
   anytime     status:open bucket:anytime     Flexible tasks

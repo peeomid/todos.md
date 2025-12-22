@@ -7,10 +7,10 @@ describe('getShorthandHelpLines', () => {
     expect(lines).toContain('(A)');
     expect(lines).toContain('(B)');
     expect(lines).toContain('(C)');
+    expect(lines).toContain('* = now');
     expect(lines).toContain('! = today');
     expect(lines).toContain('> = upcoming');
     expect(lines).toContain('~ = anytime');
     expect(lines).toContain('? = someday');
   });
 });
-

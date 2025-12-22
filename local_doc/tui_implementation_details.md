@@ -43,11 +43,12 @@ Added keys:
 
 Built-in views:
 - `0` All: `status:open`
-- `1` Today: `status:open bucket:today`
-- `2` Upcoming: `status:open bucket:upcoming`
-- `3` Anytime: `status:open bucket:anytime`
-- `4` Someday: `status:open bucket:someday`
-- `5` Projects: project list + drilldown
+- `1` Now: `status:open bucket:now`
+- `2` Today: `status:open bucket:today`
+- `3` Upcoming: `status:open bucket:upcoming`
+- `4` Anytime: `status:open bucket:anytime`
+- `5` Someday: `status:open bucket:someday`
+- `6` Projects: project list + drilldown
 
 ## Query / Filtering / Sorting
 
@@ -78,14 +79,15 @@ Implementation in `src/tui/autocomplete.ts`:
 - `getAutocompleteContext(input, cursorPos)`: analyzes input to determine if user is typing a filter key or value
 - `generateSuggestions(context, allTasks)`: produces suggestions based on current context
   - Filter key suggestions: matches partial input against known filter keys
-  - Static value suggestions: returns predefined values (e.g., `bucket: today/upcoming/anytime/someday`)
+  - Static value suggestions: returns predefined values (e.g., `bucket: now/today/upcoming/anytime/someday`)
   - Dynamic value suggestions: extracts unique values from task index (e.g., project IDs, areas, tags)
   - Date suggestions: provides `today`, `tomorrow`, and format hints
 - `applySuggestion(input, cursorPos, suggestion, context)`: replaces current token with selected suggestion
 
 **Integration with search mode:**
 - Autocomplete state added to `TUIState.search.autocomplete`
-- `updateAutocomplete(state, allTasks)` called on every keystroke in search mode
+- Search input tracks both `value` and `cursor` (so autocomplete is context-aware even when editing in the middle)
+- `updateAutocomplete(state, allTasks)` called on every input/cursor change in search mode
 - Tab key applies selected suggestion
 - Up/Down arrows navigate suggestions (when autocomplete is active)
 - Suggestions render in an inline panel below the search prompt with `renderAutocompleteSuggestions()`
@@ -101,18 +103,21 @@ Implementation in `src/tui/autocomplete.ts`:
 
 `src/tui/interactive.ts` keeps a single `SessionState` with:
 - `views`, `viewIndex`, `projects.drilldownProjectId`
-- `statusMode` (`open` vs `all`) and `search` state (active/scope/input)
+- `statusMode` (`open` vs `all`) and `search` state (active/scope/input with cursor)
 - selection + scroll (`row`, `scroll`, `selectedId`)
 - `fileMtimes` to detect external edits
 - `filteredTasks` or `filteredProjects` as the current render list
 
+Input editing helpers:
+- `src/tui/text-input.ts` provides a small single-line editor used by search and modal fields (cursor movement, word/line jumps, deletions).
+
 Rendering:
 - Full-screen redraw on every state change (simple + reliable)
 - Resize handler recomputes list height and scroll window
-- Task lists are rendered as `renderRows` (project headers + task rows); selection skips headers (headers are not selectable/collapsible).
+- Task lists are rendered as `renderRows` (area headers + project headers + task rows); headers are selectable and can be folded/unfolded (area/project/task collapse state stored in session state).
 - Task rows display bucket + priority shorthands to help users learn the todo-format shorthands:
   - priority: `(A)/(B)/(C)` (high/normal/low)
-  - bucket: `!/>/~/?` (today/upcoming/anytime/someday)
+  - bucket: `*/!/>/~/?` (now/today/upcoming/anytime/someday)
 - Help is always rendered at the bottom, below the details lines.
 - The current view tab is rendered with a distinct background color in the tabs row.
 
@@ -135,15 +140,18 @@ Movement:
 - `g/G` top/bottom
 - `Ctrl+U`/`Ctrl+D` half-page
 - `PgUp`/`PgDn` half-page (best-effort; depends on terminal-kit key mapping)
+- `:` go to line (row-number jump in task list)
+- `Enter` toggles fold/unfold on area headers, project headers, and tasks with children
 
 Task actions:
 - `space` toggle done (done cascades to all descendants; undone does not cascade)
 - `x` toggle done (alias for `space`)
 - `r` delete task (with confirmation; deletes subtasks too)
 - `p` priority menu (h/n/l/c) — shorthands: `h` high, `n` normal, `l` low
-- `b` bucket menu (t/u/a/s/c) — shorthands: `t` today, `u` upcoming, `a` anytime, `s` someday
+- `b` bucket menu (n/t/u/a/s/c) — shorthands: `n` now, `t` today, `u` upcoming, `a` anytime, `s` someday
   - plus rule: if bucket becomes `today` and `plan` is empty, set `plan` to today
-- `n` plan menu (today/manual/clear)
+- `n` toggle `bucket:now` on/off for the selected task
+- `t` plan menu (today/manual/clear)
 - `d` due menu (today/manual/clear)
 - `e` edit modal (Text + Meta):
   - Multi-field, command-line-style UX
@@ -158,7 +166,8 @@ Task actions:
 
 Projects view:
 - `Enter` drills down into a project (shows that project’s tasks)
-- `a` adds a new project (writes a new project heading and switches into that project’s drilldown view)
+- Projects list supports “type to filter” by default (live substring match on id/name/area); list navigation uses arrow keys (↑/↓), not vim keys.
+- `Ctrl+N` adds a new project (writes a new project heading and switches into that project’s drilldown view)
 - `Esc`/`Backspace` exits drilldown
 
 ## Write Path / Safety

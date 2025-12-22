@@ -41,9 +41,10 @@ export const FILTER_SPECS = {
     },
   },
   bucket: {
-    values: ['today', 'upcoming', 'anytime', 'someday'],
+    values: ['now', 'today', 'upcoming', 'anytime', 'someday'],
     description: 'Planning bucket',
     valuePreviews: {
+      now: 'Working on right now',
       today: "Today's focus",
       upcoming: 'Next up',
       anytime: 'Flexible timing',

@@ -43,6 +43,7 @@ import {
   type AutocompleteState,
 } from './autocomplete.js';
 import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
+import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor, type TextInputState } from './text-input.js';
 
 type Term = any;
 
@@ -68,14 +69,23 @@ interface SessionState {
   viewIndex: number;
   statusMode: 'open' | 'all';
   query: string;
+  command: {
+    active: boolean;
+    kind: 'gotoLine' | null;
+    input: TextInputState;
+  };
   search: {
     active: boolean;
     scope: 'view' | 'global';
-    input: string;
+    input: TextInputState;
     autocomplete: AutocompleteState;
   };
   selection: { row: number; scroll: number; selectedId: string | null };
   projects: { drilldownProjectId: string | null };
+  projectsList: { input: TextInputState };
+  collapsedProjects: Set<string>;
+  collapsedTasks: Set<string>;
+  collapsedAreas: Set<string>;
   fileMtimes: Map<string, number>;
   filteredTasks: Task[];
   renderRows: RenderRow[];
@@ -87,8 +97,9 @@ interface SessionState {
 }
 
 type RenderRow =
-  | { kind: 'header'; projectId: string; label: string; count: number }
-  | { kind: 'task'; task: Task };
+  | { kind: 'area'; area: string; label: string; count: number }
+  | { kind: 'header'; projectId: string; label: string; count: number; indent: number }
+  | { kind: 'task'; task: Task; indent: number };
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0]!;
@@ -146,6 +157,7 @@ function defaultSortForView(view: InteractiveView): SortField[] {
     case '2':
     case '3':
     case '4':
+    case '5':
       return ['priority', 'plan', 'due'];
     default:
       return ['priority', 'plan', 'due'];
@@ -155,11 +167,12 @@ function defaultSortForView(view: InteractiveView): SortField[] {
 function buildViews(config: Config): InteractiveView[] {
   const builtins: InteractiveView[] = [
     { key: '0', name: 'All', query: 'status:open', sort: 'project,priority,plan,due', kind: 'tasks' },
-    { key: '1', name: 'Today', query: 'status:open bucket:today', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '2', name: 'Upcoming', query: 'status:open bucket:upcoming', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '3', name: 'Anytime', query: 'status:open bucket:anytime', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '4', name: 'Someday', query: 'status:open bucket:someday', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '5', name: 'Projects', query: '', kind: 'projects' },
+    { key: '1', name: 'Now', query: 'status:open bucket:now', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '2', name: 'Today', query: 'status:open bucket:today', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '3', name: 'Upcoming', query: 'status:open bucket:upcoming', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '4', name: 'Anytime', query: 'status:open bucket:anytime', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '5', name: 'Someday', query: 'status:open bucket:someday', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '6', name: 'Projects', query: '', kind: 'projects' },
   ];
 
   const custom = (config.interactive?.views ?? [])
@@ -239,6 +252,16 @@ function getFooterHelpLines(
   isProjectsList: boolean,
   width: number
 ): { line1: string; line2: string } {
+  if (isProjectsList) {
+    const globalFull = ['[↑/↓] move', '[0–9] views', '[/] search', '[?] help', '[q] quit'];
+    const globalCompact = ['[/] search', '[q] quit'];
+    const line1 = width < 60 ? joinHelpChunks(globalCompact, width) : joinHelpChunks(globalFull, width);
+
+    const full = ['type = filter', '[Enter] open project', '[Ctrl+N] add project'];
+    const compact = ['type = filter', '[Enter] open', '[Ctrl+N] add'];
+    return { line1, line2: joinHelpChunks(width < 60 ? compact : full, width) };
+  }
+
   const globalFull = [
     '[j/k/↑/↓] move',
     '[g/G] top/bot',
@@ -252,19 +275,16 @@ function getFooterHelpLines(
 
   const line1 = width < 60 ? joinHelpChunks(globalCompact, width) : joinHelpChunks(globalFull, width);
 
-  if (isProjectsList) {
-    const full = ['[Enter] open project', '[a] add project', '[?] help'];
-    const compact = ['[Enter] open', '[a] add', '[?] help'];
-    return { line1, line2: joinHelpChunks(width < 60 ? compact : full, width) };
-  }
-
   if (view.kind === 'projects' && state.projects.drilldownProjectId) {
     const full = [
       '[Esc/Backspace] back',
+      '[Enter] fold',
+      '[:] goto line',
       '[space/x] done',
       '[p] pri',
       '[b] bucket',
-      '[n] plan',
+      '[n] now',
+      '[t] plan',
       '[d] due',
       '[e] edit',
       '[a] add task',
@@ -276,10 +296,13 @@ function getFooterHelpLines(
   }
 
   const tasksFull = [
+    '[Enter] fold',
+    '[:] goto line',
     '[space/x] done',
     '[p] priority',
     '[b] bucket',
-    '[n] plan',
+    '[n] now',
+    '[t] plan',
     '[d] due',
     '[e] edit',
     '[a] add',
@@ -370,6 +393,7 @@ function render(state: SessionState, term: Term): void {
     cyan: (s: string) => (state.colorsDisabled ? term(s) : term.cyan(s)),
     blue: (s: string) => (state.colorsDisabled ? term(s) : term.blue(s)),
     bucketToday: (s: string) => (state.colorsDisabled ? term(s) : term.bold.cyan(s)),
+    bucketNow: (s: string) => (state.colorsDisabled ? term(s) : term.bold.green(s)),
     queryAccent: (s: string) => (state.colorsDisabled ? term(s) : term.bold.yellow(s)),
   };
 
@@ -448,7 +472,7 @@ function render(state: SessionState, term: Term): void {
     term.styleReset();
   }
 
-  const queryRaw = state.search.active ? state.search.input : state.query;
+  const queryRaw = state.search.active ? state.search.input.value : state.query;
   const query = normalizeStatusInQuery(queryRaw, state.statusMode);
   const flags = state.statusMode === 'open' ? 'hide-done' : 'show-done';
   const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}`;
@@ -496,24 +520,22 @@ function render(state: SessionState, term: Term): void {
 
   if (isProjectsList) {
     const projects = state.filteredProjects;
+    const numberWidth = Math.max(2, String(Math.max(1, projects.length)).length);
+    const numberSep = '│ ';
+    const numberColWidth = numberWidth + terminalKit.stringWidth(numberSep);
     const start = state.selection.scroll;
     const end = Math.min(projects.length, start + listHeight);
+    const idColMax = 18;
+    const idColMin = 8;
+    const visible = projects.slice(start, end);
+    const maxIdWidth = visible.reduce((max, p) => Math.max(max, terminalKit.stringWidth(p.id)), 0);
+    const idColWidth = Math.max(idColMin, Math.min(idColMax, maxIdWidth));
+    const sep = ' — ';
     for (let i = start; i < end; i++) {
       const row = i - start;
       const p = projects[i]!;
-      const line = `${p.id}  ${p.name}${p.area ? `  (${p.area})` : ''}  ${p.filePath}:${p.lineNumber}`;
-      const y = listTop + row;
-      term.moveTo(1, y);
-      const selected = i === state.selection.row;
-      if (selected) style.inverse(truncate(line, width));
-      else style.text(truncate(line, width));
-    }
-  } else {
-    const rows = state.renderRows;
-    const start = state.selection.scroll;
-    const end = Math.min(rows.length, start + listHeight);
-    for (let i = start; i < end; i++) {
-      const row = i - start;
+      const idShown = p.id.padEnd(idColWidth);
+      const line = `${idShown}${sep}${p.name}${p.area ? ` (${p.area})` : ''}`;
       const y = listTop + row;
       term.moveTo(1, y);
       const selected = i === state.selection.row;
@@ -523,11 +545,67 @@ function render(state: SessionState, term: Term): void {
         if (selected) term.inverse();
       }
 
+      const n = String(i + 1).padStart(numberWidth);
+      if (state.colorsDisabled) term(`${n}${numberSep}`);
+      else term.dim(`${n}${numberSep}`);
+
+      const contentWidth = Math.max(0, width - numberColWidth);
+      const shown = truncateByWidth(line, contentWidth);
+      term(shown);
+      const pad = Math.max(0, contentWidth - terminalKit.stringWidth(shown));
+      if (pad > 0) term(' '.repeat(pad));
+
+      if (!state.colorsDisabled) term.styleReset();
+    }
+  } else {
+    const rows = state.renderRows;
+    const numberWidth = Math.max(2, String(Math.max(1, rows.length)).length);
+    const numberSep = '│ ';
+    const numberColWidth = numberWidth + terminalKit.stringWidth(numberSep);
+    const start = state.selection.scroll;
+    const end = Math.min(rows.length, start + listHeight);
+    for (let i = start; i < end; i++) {
+      const row = i - start;
+      const y = listTop + row;
+      term.moveTo(1, y);
+      const selected = i === state.selection.row;
+
       const r = rows[i]!;
-      if (r.kind === 'header') {
-        const labelMax = Math.max(0, width);
-        const label = truncateByWidth(r.label, labelMax);
-        const pad = Math.max(0, width - terminalKit.stringWidth(label));
+      if (!state.colorsDisabled) {
+        term.styleReset();
+        if (selected) {
+          term.inverse();
+        } else if (r.kind === 'task' && r.task.bucket === 'now') {
+          // Subtle background to make "now" tasks stand out.
+          term.bgColorRgb(0, 70, 30);
+        }
+      }
+
+      const n = String(i + 1).padStart(numberWidth);
+      if (state.colorsDisabled) term(`${n}${numberSep}`);
+      else term.dim(`${n}${numberSep}`);
+
+      const contentWidth = Math.max(0, width - numberColWidth);
+      if (r.kind === 'area') {
+        const icon = state.collapsedAreas.has(r.area) ? '▸' : '▾';
+        const labelMax = Math.max(0, contentWidth);
+        const label = truncateByWidth(`${icon} ${r.label}`, labelMax);
+        const pad = Math.max(0, contentWidth - terminalKit.stringWidth(label));
+        if (state.colorsDisabled) {
+          term(label);
+          if (pad > 0) term(' '.repeat(pad));
+        } else {
+          term.styleReset();
+          if (selected) term.inverse();
+          term.bold.magenta(label);
+          if (pad > 0) term(' '.repeat(pad));
+        }
+      } else if (r.kind === 'header') {
+        const icon = state.collapsedProjects.has(r.projectId) ? '▸' : '▾';
+        const indentPrefix = '  '.repeat(r.indent);
+        const labelMax = Math.max(0, contentWidth);
+        const label = truncateByWidth(`${indentPrefix}${icon} ${r.label}`, labelMax);
+        const pad = Math.max(0, contentWidth - terminalKit.stringWidth(label));
         if (state.colorsDisabled) {
           term(label);
           if (pad > 0) term(' '.repeat(pad));
@@ -539,6 +617,12 @@ function render(state: SessionState, term: Term): void {
         }
       } else {
         const t = r.task;
+        const structuralIndent = '  '.repeat(r.indent);
+        const depth = Math.max(0, Math.floor((t.indentLevel ?? 0) / 2));
+        const subtreeIndent = depth > 0 ? `${'  '.repeat(depth - 1)}  └─ ` : '';
+        const indentPrefix = `${structuralIndent}${subtreeIndent}`;
+        const hasChildren = (t.childrenIds?.length ?? 0) > 0;
+        const foldIcon = hasChildren ? (state.collapsedTasks.has(t.globalId) ? '▸' : '▾') : ' ';
         const checkbox = t.completed ? '[x]' : '[ ]';
         const shorthandTokens = getTaskShorthandTokens(t.priority, t.bucket);
 
@@ -550,14 +634,16 @@ function render(state: SessionState, term: Term): void {
 
         const rightPlain = rightTokens.map((x) => x.text).join('  ');
         const rightWidth = terminalKit.stringWidth(rightPlain);
-        const rightMax = Math.max(0, Math.min(width, Math.floor(width * 0.45)));
+        const rightMax = Math.max(0, Math.min(contentWidth, Math.floor(contentWidth * 0.45)));
         const rightShown = rightWidth > rightMax ? truncateByWidth(rightPlain, rightMax) : rightPlain;
 
         const rightShownWidth = terminalKit.stringWidth(rightShown);
-        const leftMax = Math.max(10, width - rightShownWidth - 2);
+        const leftMax = Math.max(10, contentWidth - rightShownWidth - 2);
 
         const shorthandPlain = shorthandTokens.map((tok) => tok.text).join(' ');
-        const leftPrefixPlain = shorthandPlain ? `${checkbox} ${shorthandPlain}  ` : `${checkbox}  `;
+        const leftPrefixPlain = shorthandPlain
+          ? `${indentPrefix}${foldIcon} ${checkbox} ${shorthandPlain}  `
+          : `${indentPrefix}${foldIcon} ${checkbox}  `;
         const leftPrefixWidth = terminalKit.stringWidth(leftPrefixPlain);
         const textMax = Math.max(0, leftMax - leftPrefixWidth);
         const shownText = truncateByWidth(t.text, textMax);
@@ -565,17 +651,22 @@ function render(state: SessionState, term: Term): void {
         const priStyle: keyof typeof style =
           t.priority === 'high' ? 'red' : t.priority === 'low' ? 'dim' : 'text';
         const bucketStyle: keyof typeof style =
-          t.bucket === 'today'
-            ? 'bucketToday'
-            : t.bucket === 'upcoming'
-              ? 'blue'
-              : t.bucket === 'someday'
-                ? 'dim'
-                : 'text';
+          t.bucket === 'now'
+            ? 'bucketNow'
+            : t.bucket === 'today'
+              ? 'bucketToday'
+              : t.bucket === 'upcoming'
+                ? 'blue'
+                : t.bucket === 'someday'
+                  ? 'dim'
+                  : 'text';
         const textStyle: keyof typeof style = t.completed ? 'dim' : 'text';
         const checkboxStyle: keyof typeof style = t.completed ? 'dim' : 'text';
 
         const segments: { text: string; style: keyof typeof style }[] = [
+          { text: indentPrefix, style: 'dim' },
+          { text: foldIcon, style: hasChildren ? 'cyan' : 'dim' },
+          { text: ' ', style: 'text' },
           { text: checkbox, style: checkboxStyle },
           { text: ' ', style: 'text' },
         ];
@@ -598,7 +689,7 @@ function render(state: SessionState, term: Term): void {
         term('  ');
 
         // Render right column with lightweight styling: plan/due cyan, rest dim
-        const rightBudget = width - leftMax - 2;
+        const rightBudget = contentWidth - leftMax - 2;
         if (rightBudget > 0) {
           // If truncated, we lose per-token styling; keep it simple in that case.
           if (rightShown !== rightPlain) {
@@ -644,7 +735,7 @@ function render(state: SessionState, term: Term): void {
             ? ` (sh: ${formatBucketSymbolShorthand(selectedTask.bucket)} / ${formatBucketTagShorthand(selectedTask.bucket)})`
             : ''
         }  `,
-        style: selectedTask.bucket === 'today' ? 'bucketToday' : 'text',
+        style: selectedTask.bucket === 'now' ? 'bucketNow' : selectedTask.bucket === 'today' ? 'bucketToday' : 'text',
       },
       { text: 'priority:', style: 'dim' },
       {
@@ -668,12 +759,12 @@ function render(state: SessionState, term: Term): void {
     term.moveTo(1, footerTop + 2);
     style.text(
       truncate(
-        `area: ${selectedProject.area ?? '-'}  file: ${selectedProject.filePath}:${selectedProject.lineNumber}`,
+        `area: ${selectedProject.area ?? '-'}`,
         width
       )
     );
     term.moveTo(1, footerTop + 3);
-    style.dim(truncate(`file: ${selectedProject.filePath}:${selectedProject.lineNumber}`, width));
+    style.dim(truncate('', width));
   } else {
     style.dim(truncate('No selection', width));
     term.moveTo(1, footerTop + 2);
@@ -711,7 +802,8 @@ function render(state: SessionState, term: Term): void {
     term.eraseLineAfter();
     const { cursorCol } = renderLabeledInputField(term, {
       label,
-      value: state.search.input,
+      value: state.search.input.value,
+      cursorIndex: state.search.input.cursor,
       width,
       colorsDisabled: state.colorsDisabled,
       placeholder: 'type filters (e.g. bucket:today) …',
@@ -719,6 +811,32 @@ function render(state: SessionState, term: Term): void {
     term.eraseLineAfter();
 
     // Also show the real terminal cursor (some terminals/themes make painted cursors hard to see).
+    term.moveTo(cursorCol, footerTop + 7);
+    setCursorVisible(term, true);
+  } else if (state.command.active) {
+    term.eraseLineAfter();
+    const { cursorCol } = renderLabeledInputField(term, {
+      label: ': ',
+      value: state.command.input.value,
+      cursorIndex: state.command.input.cursor,
+      width,
+      colorsDisabled: state.colorsDisabled,
+      placeholder: 'line number',
+    });
+    term.eraseLineAfter();
+    term.moveTo(cursorCol, footerTop + 7);
+    setCursorVisible(term, true);
+  } else if (isProjectsList) {
+    term.eraseLineAfter();
+    const { cursorCol } = renderLabeledInputField(term, {
+      label: 'Projects ',
+      value: state.projectsList.input.value,
+      cursorIndex: state.projectsList.input.cursor,
+      width,
+      colorsDisabled: state.colorsDisabled,
+      placeholder: 'type to filter…',
+    });
+    term.eraseLineAfter();
     term.moveTo(cursorCol, footerTop + 7);
     setCursorVisible(term, true);
   } else {
@@ -738,7 +856,7 @@ function render(state: SessionState, term: Term): void {
     });
   }
 
-  if (!state.search.active) {
+  if (!state.search.active && !state.command.active && !isProjectsList) {
     term.hideCursor();
   }
 }
@@ -758,10 +876,25 @@ function recompute(state: SessionState): void {
   const view = state.views[state.viewIndex]!;
 
   if (view.kind === 'projects' && !state.projects.drilldownProjectId) {
-    const projects = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
+    const all = Object.values(state.index.projects).sort((a, b) => a.id.localeCompare(b.id));
+    const q = state.projectsList.input.value.trim().toLowerCase();
+    const projects = all
+      .map((p) => {
+        const hay = `${p.id} ${p.name} ${p.area ?? ''}`.toLowerCase();
+        const ok = q === '' ? true : hay.includes(q);
+        const score = q && p.id.toLowerCase().startsWith(q) ? 2 : q && hay.includes(q) ? 1 : 0;
+        return { p, ok, score };
+      })
+      .filter((x) => x.ok)
+      .sort((a, b) => b.score - a.score || a.p.id.localeCompare(b.p.id))
+      .map((x) => x.p);
+
+    const prevSelectedId = state.selection.selectedId;
     state.filteredProjects = projects;
     state.filteredTasks = [];
 
+    const idx = prevSelectedId ? projects.findIndex((p) => p.id === prevSelectedId) : -1;
+    if (idx >= 0) state.selection.row = idx;
     const maxRow = Math.max(0, projects.length - 1);
     state.selection.row = clamp(state.selection.row, 0, maxRow);
     state.selection.scroll = clamp(state.selection.scroll, 0, Math.max(0, projects.length - 1));
@@ -771,8 +904,8 @@ function recompute(state: SessionState): void {
 
   const inProjectDrilldown = view.kind === 'projects' && Boolean(state.projects.drilldownProjectId);
 
-  const query = state.search.active ? state.search.input : state.query;
-  const normalized = normalizeStatusInQuery(query, state.statusMode);
+  const queryString = state.search.active ? state.search.input.value : state.query;
+  const normalized = normalizeStatusInQuery(queryString, state.statusMode);
   const tokens = parseQueryString(normalized);
   const structured = tokens.filter((t) => parseFilterArg(t) !== null);
   const freeText = tokens.filter((t) => parseFilterArg(t) === null);
@@ -796,46 +929,156 @@ function recompute(state: SessionState): void {
 
   state.filteredTasks = tasks;
   state.filteredProjects = [];
+  const prevSelectedId = state.selection.selectedId;
+  const prevRow = state.renderRows[state.selection.row];
+  const prevHeaderProjectId = prevRow?.kind === 'header' ? prevRow.projectId : null;
+  const prevArea = prevRow?.kind === 'area' ? prevRow.area : null;
+  const prevTaskProjectId = prevSelectedId ? state.index.tasks[prevSelectedId]?.projectId ?? null : null;
   state.renderRows = [];
 
+  const areaRowIndexByArea = new Map<string, number>();
+  const headerRowIndexByProjectId = new Map<string, number>();
   const taskRowIndexById = new Map<string, number>();
-  if (state.groupBy === 'project' && tasks.length > 0) {
+
+  if (state.groupBy === 'project') {
     const grouped = groupTasks(tasks, 'project');
-    const keys = [...grouped.keys()].sort((a, b) => a.localeCompare(b));
-    for (const projectId of keys) {
+
+    const isHiddenByCollapsedAncestor = (task: Task): boolean => {
+      let current = task.parentId;
+      const seen = new Set<string>();
+      while (current) {
+        if (seen.has(current)) return false;
+        seen.add(current);
+        if (state.collapsedTasks.has(current)) return true;
+        const parent = state.index.tasks[current];
+        current = parent?.parentId ?? null;
+      }
+      return false;
+    };
+
+    const explicitProjectId =
+      (inProjectDrilldown ? state.projects.drilldownProjectId : null) ?? options.project ?? null;
+
+    const projectIdsToRender: string[] =
+      explicitProjectId ? [explicitProjectId] : [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+
+    const projectsByArea = new Map<string | null, string[]>();
+    const areaTaskCounts = new Map<string, number>();
+
+    for (const projectId of projectIdsToRender) {
+      const group = grouped.get(projectId) ?? [];
+      const project = state.index.projects[projectId];
+
+      // No "empty" area headers: if a project has 0 matching tasks, don't attach it to an area header.
+      let areaKey: string | null = null;
+      if (group.length > 0) {
+        const candidate = project?.parentArea ?? project?.area;
+        if (candidate && state.index.areas?.[candidate]) {
+          areaKey = candidate;
+          areaTaskCounts.set(candidate, (areaTaskCounts.get(candidate) ?? 0) + group.length);
+        }
+      }
+
+      const arr = projectsByArea.get(areaKey) ?? [];
+      arr.push(projectId);
+      projectsByArea.set(areaKey, arr);
+    }
+
+    const areaKeys = [...projectsByArea.keys()]
+      .filter((k): k is string => typeof k === 'string' && Boolean(k))
+      .sort((a, b) => {
+        const an = state.index.areas?.[a]?.name ?? a;
+        const bn = state.index.areas?.[b]?.name ?? b;
+        return an.localeCompare(bn) || a.localeCompare(b);
+      });
+
+    for (const area of areaKeys) {
+      const count = areaTaskCounts.get(area) ?? 0;
+      if (count <= 0) continue;
+
+      const areaHeading = state.index.areas?.[area];
+      const areaName = areaHeading?.name ?? area;
+      const label = `${areaName} [area:${area}] (${count} task${count === 1 ? '' : 's'})`;
+      const areaIdx = state.renderRows.length;
+      state.renderRows.push({ kind: 'area', area, label, count });
+      areaRowIndexByArea.set(area, areaIdx);
+
+      if (state.collapsedAreas.has(area)) continue;
+
+      const projectIds = (projectsByArea.get(area) ?? []).sort((a, b) => a.localeCompare(b));
+      for (const projectId of projectIds) {
+        const group = grouped.get(projectId) ?? [];
+        const project = state.index.projects[projectId];
+        const projectName = project?.name ?? '(unknown project)';
+        const pCount = group.length;
+        const headerLabel = `${projectId} — ${projectName} (${pCount} task${pCount === 1 ? '' : 's'})`;
+        const headerIdx = state.renderRows.length;
+        state.renderRows.push({ kind: 'header', projectId, label: headerLabel, count: pCount, indent: 1 });
+        headerRowIndexByProjectId.set(projectId, headerIdx);
+
+        if (state.collapsedProjects.has(projectId)) continue;
+        for (const task of group) {
+          if (isHiddenByCollapsedAncestor(task)) continue;
+          const idx = state.renderRows.length;
+          state.renderRows.push({ kind: 'task', task, indent: 2 });
+          taskRowIndexById.set(task.globalId, idx);
+        }
+      }
+    }
+
+    // Ungrouped projects (no area heading)
+    const ungrouped = (projectsByArea.get(null) ?? []).sort((a, b) => a.localeCompare(b));
+    for (const projectId of ungrouped) {
       const group = grouped.get(projectId) ?? [];
       const project = state.index.projects[projectId];
       const projectName = project?.name ?? '(unknown project)';
-      const count = group.length;
-      const headerLabel = `${projectId} — ${projectName} (${count} task${count === 1 ? '' : 's'})`;
-      state.renderRows.push({ kind: 'header', projectId, label: headerLabel, count: group.length });
+      const pCount = group.length;
+
+      // In explicit project mode, show the project header even if empty.
+      if (!explicitProjectId && pCount <= 0) continue;
+
+      const headerLabel = `${projectId} — ${projectName} (${pCount} task${pCount === 1 ? '' : 's'})`;
+      const headerIdx = state.renderRows.length;
+      state.renderRows.push({ kind: 'header', projectId, label: headerLabel, count: pCount, indent: 0 });
+      headerRowIndexByProjectId.set(projectId, headerIdx);
+
+      if (state.collapsedProjects.has(projectId)) continue;
       for (const task of group) {
+        if (isHiddenByCollapsedAncestor(task)) continue;
         const idx = state.renderRows.length;
-        state.renderRows.push({ kind: 'task', task });
+        state.renderRows.push({ kind: 'task', task, indent: 0 });
         taskRowIndexById.set(task.globalId, idx);
       }
     }
   } else {
     for (const task of tasks) {
       const idx = state.renderRows.length;
-      state.renderRows.push({ kind: 'task', task });
+      state.renderRows.push({ kind: 'task', task, indent: 0 });
       taskRowIndexById.set(task.globalId, idx);
     }
   }
 
-  const selectedId = state.selection.selectedId;
-  if (selectedId && taskRowIndexById.has(selectedId)) {
-    state.selection.row = taskRowIndexById.get(selectedId)!;
-    state.selection.selectedId = selectedId;
+  if (prevSelectedId && taskRowIndexById.has(prevSelectedId)) {
+    state.selection.row = taskRowIndexById.get(prevSelectedId)!;
+    state.selection.selectedId = prevSelectedId;
   } else {
-    const firstTaskRow = state.renderRows.findIndex((r) => r.kind === 'task');
-    if (firstTaskRow === -1) {
-      state.selection.row = 0;
+    const headerFallback = prevHeaderProjectId ?? prevTaskProjectId;
+    if (headerFallback && headerRowIndexByProjectId.has(headerFallback)) {
+      state.selection.row = headerRowIndexByProjectId.get(headerFallback)!;
+      state.selection.selectedId = null;
+    } else if (prevArea && areaRowIndexByArea.has(prevArea)) {
+      state.selection.row = areaRowIndexByArea.get(prevArea)!;
       state.selection.selectedId = null;
     } else {
-      state.selection.row = firstTaskRow;
-      const row = state.renderRows[firstTaskRow] as Extract<RenderRow, { kind: 'task' }>;
-      state.selection.selectedId = row.task.globalId;
+      const firstTaskRow = state.renderRows.findIndex((r) => r.kind === 'task');
+      if (firstTaskRow >= 0) {
+        state.selection.row = firstTaskRow;
+        const row = state.renderRows[firstTaskRow] as Extract<RenderRow, { kind: 'task' }>;
+        state.selection.selectedId = row.task.globalId;
+      } else {
+        state.selection.row = 0;
+        state.selection.selectedId = null;
+      }
     }
   }
 
@@ -1018,8 +1261,8 @@ function parseManualDateInput(input: string): string | null {
  * Update autocomplete state based on current search input
  */
 function updateAutocomplete(state: SessionState): void {
-  const input = state.search.input;
-  const cursorPos = input.length; // Simplified: cursor always at end
+  const input = state.search.input.value;
+  const cursorPos = toCodeUnitCursor(state.search.input.value, state.search.input.cursor);
   const allTasks = Object.values(state.index.tasks);
 
   const context = getAutocompleteContext(input, cursorPos);
@@ -1039,13 +1282,14 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   const state: SessionState = {
     index: options.index,
     views: buildViews(options.config),
-    viewIndex: 1, // default Today
+    viewIndex: 2, // default Today
     statusMode: 'open',
     query: '',
+    command: { active: false, kind: null, input: createTextInput('') },
     search: {
       active: false,
       scope: 'view',
-      input: '',
+      input: createTextInput(''),
       autocomplete: {
         active: false,
         suggestions: [],
@@ -1055,6 +1299,10 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     },
     selection: { row: 0, scroll: 0, selectedId: null },
     projects: { drilldownProjectId: null },
+    projectsList: { input: createTextInput('') },
+    collapsedProjects: new Set<string>(),
+    collapsedTasks: new Set<string>(),
+    collapsedAreas: new Set<string>(),
     fileMtimes: getFileMtimes(options.index),
     filteredTasks: [],
     renderRows: [],
@@ -1086,7 +1334,13 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       state.viewIndex = idx;
       state.projects.drilldownProjectId = null;
       state.search.active = false;
-      state.search.input = '';
+      state.search.input = createTextInput('');
+      state.command.active = false;
+      state.command.kind = null;
+      state.command.input = createTextInput('');
+      if (state.views[idx]?.kind === 'projects') {
+        state.projectsList.input = createTextInput('');
+      }
       state.query = getEffectiveQuery(state);
       state.selection = { row: 0, scroll: 0, selectedId: null };
       recompute(state);
@@ -1098,7 +1352,13 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     state.viewIndex = next;
     state.projects.drilldownProjectId = null;
     state.search.active = false;
-    state.search.input = '';
+    state.search.input = createTextInput('');
+    state.command.active = false;
+    state.command.kind = null;
+    state.command.input = createTextInput('');
+    if (state.views[next]?.kind === 'projects') {
+      state.projectsList.input = createTextInput('');
+    }
     state.query = getEffectiveQuery(state);
     state.selection = { row: 0, scroll: 0, selectedId: null };
     recompute(state);
@@ -1113,38 +1373,10 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
   }
 
-  function findTaskRowFrom(start: number, direction: -1 | 1): number | null {
-    const rows = state.renderRows;
-    if (rows.length === 0) return null;
-    let i = clamp(start, 0, rows.length - 1);
-    while (i >= 0 && i < rows.length) {
-      if (rows[i]?.kind === 'task') return i;
-      i += direction;
-    }
-    return null;
-  }
-
-  function firstTaskRow(): number | null {
-    return findTaskRowFrom(0, 1);
-  }
-
-  function lastTaskRow(): number | null {
-    return findTaskRowFrom(state.renderRows.length - 1, -1);
-  }
-
-  function selectTaskRow(rowIndex: number | null): void {
-    if (rowIndex === null) {
-      state.selection.row = 0;
-      state.selection.selectedId = null;
-      return;
-    }
+  function selectRenderRow(rowIndex: number): void {
     state.selection.row = rowIndex;
     const row = state.renderRows[rowIndex];
-    if (row?.kind === 'task') {
-      state.selection.selectedId = row.task.globalId;
-    } else {
-      state.selection.selectedId = null;
-    }
+    state.selection.selectedId = row?.kind === 'task' ? row.task.globalId : null;
   }
 
   async function toggleDone(): Promise<void> {
@@ -1244,8 +1476,8 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const choice = await showKeyMenu(
       term,
       `Set bucket — ${selected.globalId}`,
-      [`Task: ${selected.text}`, '', '[t] today', '[u] upcoming', '[a] anytime', '[s] someday', '[c] clear'],
-      ['t', 'u', 'a', 's', 'c'],
+      [`Task: ${selected.text}`, '', '[n] now', '[t] today', '[u] upcoming', '[a] anytime', '[s] someday', '[c] clear'],
+      ['n', 't', 'u', 'a', 's', 'c'],
       state.colorsDisabled
     );
     if (!choice) return;
@@ -1258,6 +1490,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const changes: Record<string, string | null> = {};
     if (choice === 'c') changes.bucket = null;
+    if (choice === 'n') changes.bucket = 'now';
     if (choice === 't') changes.bucket = 'today';
     if (choice === 'u') changes.bucket = 'upcoming';
     if (choice === 'a') changes.bucket = 'anytime';
@@ -1266,6 +1499,25 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     if (choice === 't' && !task.plan) {
       changes.plan = todayIso();
     }
+
+    updateTaskMetadataInFile(task, changes);
+    refreshFromDisk();
+    state.selection.selectedId = taskId;
+  }
+
+  async function toggleNowBucket(): Promise<void> {
+    const selected = getSelectedTask(state);
+    if (!selected) return;
+    const taskId = selected.globalId;
+
+    const res = await ensureFileFresh(term, state, selected.filePath, refreshFromDisk);
+    if (!res.ok) return;
+
+    const task = state.index.tasks[taskId];
+    if (!task) return;
+
+    const changes: Record<string, string | null> = {};
+    changes.bucket = task.bucket === 'now' ? null : 'now';
 
     updateTaskMetadataInFile(task, changes);
     refreshFromDisk();
@@ -1571,13 +1823,13 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     appendProjectHeadingToFile({ filePath, headingLevel, projectId, name, area });
     refreshFromDisk();
 
-    const projectsViewIdx = state.views.findIndex((v) => v.key === '5');
+    const projectsViewIdx = state.views.findIndex((v) => v.key === '6');
     if (projectsViewIdx !== -1) {
       state.viewIndex = projectsViewIdx;
     }
     state.projects.drilldownProjectId = projectId;
     state.search.active = false;
-    state.search.input = '';
+    state.search.input = createTextInput('');
     state.query = getEffectiveQuery(state);
     state.selection = { row: 0, scroll: 0, selectedId: null };
     recompute(state);
@@ -1676,7 +1928,13 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
       if (state.search.active) {
         state.search.active = false;
-        state.search.input = '';
+        state.search.input = createTextInput('');
+        recompute(state);
+      }
+      if (state.command.active) {
+        state.command.active = false;
+        state.command.kind = null;
+        state.command.input = createTextInput('');
         recompute(state);
       }
 
@@ -1720,14 +1978,15 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
             state.search.autocomplete.suggestions[state.search.autocomplete.selectedIndex]!;
           const context = state.search.autocomplete.context!;
 
-          const { newInput } = applySuggestion(
-            state.search.input,
-            state.search.input.length,
+          const cursorPos = toCodeUnitCursor(state.search.input.value, state.search.input.cursor);
+          const { newInput, newCursorPos } = applySuggestion(
+            state.search.input.value,
+            cursorPos,
             selected,
             context
           );
 
-          state.search.input = newInput;
+          state.search.input = { value: newInput, cursor: toCodepointCursor(newInput, newCursorPos) };
 
           // Regenerate autocomplete for new position
           updateAutocomplete(state);
@@ -1759,16 +2018,16 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       if (name === 'z') {
         state.statusMode = state.statusMode === 'open' ? 'all' : 'open';
         state.query = normalizeStatusInQuery(state.query, state.statusMode);
-        state.search.input = normalizeStatusInQuery(state.search.input, state.statusMode);
+        state.search.input = createTextInput(normalizeStatusInQuery(state.search.input.value, state.statusMode));
         updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
       }
       if (name === 'ENTER') {
-        state.query = normalizeStatusInQuery(state.search.input.trim(), state.statusMode);
+        state.query = normalizeStatusInQuery(state.search.input.value.trim(), state.statusMode);
         state.search.active = false;
-        state.search.input = '';
+        state.search.input = createTextInput('');
         state.search.autocomplete.active = false;
         recompute(state);
         render(state, term);
@@ -1776,7 +2035,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       }
       if (name === 'ESCAPE') {
         state.search.active = false;
-        state.search.input = '';
+        state.search.input = createTextInput('');
         state.search.autocomplete.active = false;
         recompute(state);
         render(state, term);
@@ -1786,38 +2045,66 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         if (state.search.scope === 'view') {
           // switch to global: strip base query if present
           const base = getEffectiveQuery(state);
-          const current = state.search.input.trim();
+          const current = state.search.input.value.trim();
           const stripped = current.startsWith(base) ? current.slice(base.length).trim() : current;
           state.search.scope = 'global';
-          state.search.input = stripped;
+          state.search.input = createTextInput(stripped);
         } else {
           const base = getEffectiveQuery(state);
           state.search.scope = 'view';
-          state.search.input = `${base}${state.search.input ? ` ${state.search.input}` : ''}`.trim();
+          const current = state.search.input.value;
+          state.search.input = createTextInput(`${base}${current ? ` ${current}` : ''}`.trim());
         }
         updateAutocomplete(state);
         recompute(state);
         render(state, term);
         return;
       }
-      if (name === 'BACKSPACE') {
-        state.search.input = state.search.input.slice(0, -1);
+      const applied = applyTextInputKey(state.search.input, name);
+      if (applied) {
+        state.search.input = applied.state;
         updateAutocomplete(state);
-        recompute(state);
+        if (applied.didChangeValue) recompute(state);
         render(state, term);
         return;
       }
-      if (isSpaceKeyName(name)) {
-        state.search.input += ' ';
-        updateAutocomplete(state);
-        recompute(state);
+      return;
+    }
+
+    // Command mode (":" → go to line)
+    if (state.command.active) {
+      if (name === 'ESCAPE') {
+        state.command.active = false;
+        state.command.kind = null;
+        state.command.input = createTextInput('');
         render(state, term);
         return;
       }
-      if (name.length === 1) {
-        state.search.input += name;
-        updateAutocomplete(state);
-        recompute(state);
+      if (name === 'ENTER') {
+        const raw = state.command.input.value.trim();
+        const n = Number.parseInt(raw, 10);
+        const listSize = state.renderRows.length;
+        if (!Number.isFinite(n) || n <= 0) {
+          state.message = `Invalid line: ${raw || '(empty)'}`;
+        } else if (listSize <= 0) {
+          state.message = 'No rows';
+        } else {
+          const target = clamp(n - 1, 0, Math.max(0, listSize - 1));
+          selectRenderRow(target);
+          updateScrollForSelection(listSize, listHeight);
+        }
+        state.command.active = false;
+        state.command.kind = null;
+        state.command.input = createTextInput('');
+        render(state, term);
+        return;
+      }
+
+      // Accept digits + normal text editing keys; sanitize to digits.
+      const applied = applyTextInputKey(state.command.input, name);
+      if (applied) {
+        const digits = applied.state.value.replace(/\D/g, '');
+        state.command.input = createTextInput(digits);
         render(state, term);
         return;
       }
@@ -1834,7 +2121,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     if (name === '/') {
       state.search.active = true;
       state.search.scope = 'view';
-      state.search.input = ensureTrailingSpace(state.query);
+      state.search.input = createTextInput(ensureTrailingSpace(state.query));
       updateAutocomplete(state);
       render(state, term);
       return;
@@ -1862,12 +2149,12 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
 
     // View navigation
-    if (name === 'LEFT' || name === 'h') {
+    if (!isProjectsList && (name === 'LEFT' || name === 'h')) {
       setNextView(-1);
       render(state, term);
       return;
     }
-    if (name === 'RIGHT' || name === 'l') {
+    if (!isProjectsList && (name === 'RIGHT' || name === 'l')) {
       setNextView(1);
       render(state, term);
       return;
@@ -1902,8 +2189,32 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    // Projects list: add project
-    if (isProjectsList && name === 'a') {
+    // Projects list: live filter (typing edits the filter)
+    if (isProjectsList) {
+      if (name === 'ESCAPE' && state.projectsList.input.value.trim() !== '') {
+        state.projectsList.input = createTextInput('');
+        state.selection = { row: 0, scroll: 0, selectedId: null };
+        recompute(state);
+        render(state, term);
+        return;
+      }
+      const applied = applyTextInputKey(state.projectsList.input, name);
+      if (applied && applied.didChangeValue) {
+        state.projectsList.input = applied.state;
+        recompute(state);
+        render(state, term);
+        return;
+      }
+      // If it was just cursor movement, still rerender for cursor visibility.
+      if (applied) {
+        state.projectsList.input = applied.state;
+        render(state, term);
+        return;
+      }
+    }
+
+    // Projects list: add project (Ctrl+N)
+    if (isProjectsList && name === 'CTRL_N') {
       state.busy = true;
       render(state, term);
       try {
@@ -1928,80 +2239,128 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const listSize = isProjectsList ? state.filteredProjects.length : state.renderRows.length;
 
+    // Task list: ":" go to line (vim-style)
+    if (!isProjectsList && name === ':') {
+      state.command.active = true;
+      state.command.kind = 'gotoLine';
+      state.command.input = createTextInput('');
+      render(state, term);
+      return;
+    }
+
+    // Task list: Enter toggles project folding on headers
+    if (!isProjectsList && name === 'ENTER') {
+      const row = state.renderRows[state.selection.row];
+      if (row?.kind === 'area') {
+        const area = row.area;
+        if (state.collapsedAreas.has(area)) state.collapsedAreas.delete(area);
+        else state.collapsedAreas.add(area);
+        recompute(state);
+        const areaIndex = state.renderRows.findIndex((r) => r.kind === 'area' && r.area === area);
+        if (areaIndex >= 0) selectRenderRow(areaIndex);
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+      }
+      if (row?.kind === 'header') {
+        const projectId = row.projectId;
+        if (state.collapsedProjects.has(projectId)) state.collapsedProjects.delete(projectId);
+        else state.collapsedProjects.add(projectId);
+        recompute(state);
+        // Keep selection on the same header if it still exists.
+        const headerIndex = state.renderRows.findIndex((r) => r.kind === 'header' && r.projectId === projectId);
+        if (headerIndex >= 0) selectRenderRow(headerIndex);
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+      }
+      if (row?.kind === 'task') {
+        const task = row.task;
+        const hasChildren = (task.childrenIds?.length ?? 0) > 0;
+        if (!hasChildren) return;
+        if (state.collapsedTasks.has(task.globalId)) state.collapsedTasks.delete(task.globalId);
+        else state.collapsedTasks.add(task.globalId);
+        // Preserve selection on the same task.
+        state.selection.selectedId = task.globalId;
+        recompute(state);
+        const taskIndex = state.renderRows.findIndex((r) => r.kind === 'task' && r.task.globalId === task.globalId);
+        if (taskIndex >= 0) selectRenderRow(taskIndex);
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+      }
+      return;
+    }
+
     // Movement
-    if (name === 'DOWN' || name === 'j') {
+    if (name === 'DOWN' || (!isProjectsList && name === 'j')) {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row + 1, 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        const next = findTaskRowFrom(state.selection.row + 1, 1) ?? lastTaskRow();
-        selectTaskRow(next);
+        const next = clamp(state.selection.row + 1, 0, Math.max(0, listSize - 1));
+        selectRenderRow(next);
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
       return;
     }
-    if (name === 'UP' || name === 'k') {
+    if (name === 'UP' || (!isProjectsList && name === 'k')) {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row - 1, 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        const prev = findTaskRowFrom(state.selection.row - 1, -1) ?? firstTaskRow();
-        selectTaskRow(prev);
+        const prev = clamp(state.selection.row - 1, 0, Math.max(0, listSize - 1));
+        selectRenderRow(prev);
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
       return;
     }
-    if (name === 'g') {
+    if ((!isProjectsList && name === 'g')) {
       if (isProjectsList) {
         state.selection.row = 0;
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        selectTaskRow(firstTaskRow());
+        selectRenderRow(0);
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
       return;
     }
-    if (name === 'G') {
+    if ((!isProjectsList && name === 'G')) {
       if (isProjectsList) {
         state.selection.row = Math.max(0, listSize - 1);
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        selectTaskRow(lastTaskRow());
+        selectRenderRow(Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
       return;
     }
-    if (name === 'CTRL_U' || name === 'PAGE_UP') {
+    if ((!isProjectsList && (name === 'CTRL_U' || name === 'PAGE_UP'))) {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row - Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        const target = clamp(state.selection.row - Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
-        const up = findTaskRowFrom(target, -1) ?? firstTaskRow();
-        selectTaskRow(up);
+        const up = clamp(state.selection.row - Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
+        selectRenderRow(up);
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
       return;
     }
-    if (name === 'CTRL_D' || name === 'PAGE_DOWN') {
+    if ((!isProjectsList && (name === 'CTRL_D' || name === 'PAGE_DOWN'))) {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row + Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
         state.selection.selectedId = state.filteredProjects[state.selection.row]?.id ?? null;
       } else {
-        const target = clamp(state.selection.row + Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
-        const down = findTaskRowFrom(target, 1) ?? lastTaskRow();
-        selectTaskRow(down);
+        const down = clamp(state.selection.row + Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
+        selectRenderRow(down);
         updateScrollForSelection(listSize, listHeight);
       }
       render(state, term);
@@ -2062,6 +2421,18 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         state.busy = true;
         render(state, term);
         try {
+          await toggleNowBucket();
+        } finally {
+          state.busy = false;
+          recompute(state);
+          render(state, term);
+        }
+        return;
+      }
+      if (name === 't') {
+        state.busy = true;
+        render(state, term);
+        try {
           await setPlanOrDue('plan');
         } finally {
           state.busy = false;
@@ -2116,7 +2487,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     void keyHandler(name).catch((error: unknown) => {
       state.busy = false;
       state.search.active = false;
-      state.search.input = '';
+      state.search.input = createTextInput('');
       ctrlCArmedAt = null;
       if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
       ctrlCResetTimer = null;

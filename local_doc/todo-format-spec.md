@@ -292,7 +292,7 @@ All dates use `YYYY-MM-DD`.
   * Examples:
 
     * System-style buckets:
-      `bucket:today`, `bucket:upcoming`, `bucket:anytime`, `bucket:someday`
+      `bucket:now`, `bucket:today`, `bucket:upcoming`, `bucket:anytime`, `bucket:someday`
     * User/custom buckets:
       `bucket:errands`, `bucket:focus`, `bucket:deepwork`
   * If I write `bucket:` myself, I can use any value I want.
@@ -342,6 +342,7 @@ tmd (via `tmd enrich`) can look for these shorthands and convert them into prope
 
 Supported tags:
 
+* `@now`
 * `@today`
 * `@upcoming`
 * `@anytime`
@@ -366,6 +367,8 @@ Or even on tasks without a metadata block yet:
 
 On a given day (e.g. 2025-12-08):
 
+* `@now`
+  → set `bucket:now`
 * `@today`
   → set `bucket:today` and, if `plan` is empty, set `plan:2025-12-08`
 * `@upcoming`
@@ -383,6 +386,7 @@ You can choose whether `tmd enrich` **removes** the `@tag` from the text after c
 
 Supported symbols as the **first token** after the checkbox (or after an optional priority shorthand):
 
+* `*` → now
 * `!` → today
 * `>` → upcoming
 * `~` → anytime
@@ -401,6 +405,8 @@ Example:
 
 On a given day (e.g. 2025-12-08):
 
+* `*`
+  → set `bucket:now`
 * `!`
   → set `bucket:today` and, if `plan` is empty, set `plan:2025-12-08`
 * `>`
@@ -474,9 +480,10 @@ Look immediately after `- [ ]`/`- [x]` for `(X)`:
 * `(B)` → `priority:normal`
 * `(C)` → `priority:low`
 
-**Step 2 – Detect bucket shorthand symbols `!`/`>`/`~`/`?`**
+**Step 2 – Detect bucket shorthand symbols `*`/`!`/`>`/`~`/`?`**
 
 Next, look for the bucket symbol (after optional priority):
+* `*` → `bucket:now`
 * `!` → `bucket:today` + `plan:<today-date>` if plan is empty
 * `>` → `bucket:upcoming`
 * `~` → `bucket:anytime`
@@ -517,7 +524,7 @@ Scan text for `@today`, `@upcoming`, `@anytime`, `@someday`.
 Canonical rules remain:
 
 * `plan` is always a real date (`YYYY-MM-DD`).
-* `bucket` is any string (default system ones: `today`, `upcoming`, `anytime`, `someday`).
+* `bucket` is any string (default system ones: `now`, `today`, `upcoming`, `anytime`, `someday`).
 * `due` is an optional deadline date, separated from `plan`.
 * `priority` is `high`, `normal`, or `low`.
 

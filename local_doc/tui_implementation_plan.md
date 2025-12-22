@@ -12,7 +12,7 @@ This plan describes how to implement the interactive full-screen terminal UI for
 
 - Full-screen TUI launched via `tmd interactive` and shortcut alias `tmd i`.
 - Startup ensures tasks have IDs: run `tmd enrich` before indexing.
-- Views: built-ins `0–5` + custom views from config; view cycling via `h/l` and arrows.
+- Views: built-ins `0–6` + custom views from config; view cycling via `h/l` and arrows.
 - In-view live search (`/`) with scope toggle (view/global), live filtering on each keypress.
 - Global show/hide done toggle (`z`) rewrites the current query (`status:open` ↔ `status:all`).
 - Task list rendering is grouped by project in all task views, using a header row: `projectId — project name (count)`.
@@ -136,13 +136,13 @@ Acceptance:
   - `interactive.views[]`: `{ key, name, query, sort? }`
   - `interactive.groupBy`: `"project"` (default) | `"none"`
   - `interactive.colors.disable` (optional)
-- Implement built-in views `0–5`:
+- Implement built-in views `0–6`:
   - `0 All`: `status:open` (default); `z` toggles to `status:all`
   - `1 Today`: `status:open bucket:today`
   - `2 Upcoming`: `status:open bucket:upcoming`
   - `3 Anytime`: `status:open bucket:anytime`
   - `4 Someday`: `status:open bucket:someday`
-  - `5 Projects`: project list mode
+  - `6 Projects`: project list mode
 - Merge custom views into the view cycle.
 
 Acceptance:

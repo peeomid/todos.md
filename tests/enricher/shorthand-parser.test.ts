@@ -40,6 +40,14 @@ describe('parseShorthands', () => {
   });
 
   describe('bucket symbol shorthands', () => {
+    it('parses * as now bucket', () => {
+      const result = parseShorthands('* Working on this', false, today);
+      expect(result.bucket).toBe('now');
+      expect(result.plan).toBeUndefined();
+      expect(result.shorthandType).toBe('*');
+      expect(result.cleanedText).toBe('Working on this');
+    });
+
     it('parses ! as today bucket with plan', () => {
       const result = parseShorthands('! Do this today', false, today);
       expect(result.bucket).toBe('today');
@@ -78,6 +86,14 @@ describe('parseShorthands', () => {
   });
 
   describe('@tag shorthands', () => {
+    it('parses @now as now bucket', () => {
+      const result = parseShorthands('Task @now', false, today);
+      expect(result.bucket).toBe('now');
+      expect(result.plan).toBeUndefined();
+      expect(result.shorthandType).toBe('@now');
+      expect(result.cleanedText).toBe('Task');
+    });
+
     it('parses @today as today bucket with plan', () => {
       const result = parseShorthands('Task @today needs doing', false, today);
       expect(result.bucket).toBe('today');
@@ -155,6 +171,7 @@ describe('hasShorthands', () => {
   });
 
   it('returns true for bucket symbols', () => {
+    expect(hasShorthands('* Task')).toBe(true);
     expect(hasShorthands('! Task')).toBe(true);
     expect(hasShorthands('> Task')).toBe(true);
     expect(hasShorthands('~ Task')).toBe(true);
@@ -162,6 +179,7 @@ describe('hasShorthands', () => {
   });
 
   it('returns true for @tags', () => {
+    expect(hasShorthands('Task @now')).toBe(true);
     expect(hasShorthands('Task @today')).toBe(true);
     expect(hasShorthands('Task @upcoming')).toBe(true);
     expect(hasShorthands('Task @anytime')).toBe(true);
