@@ -127,7 +127,6 @@ Global:
 - `q` quit
 - `Ctrl+C` quits if pressed twice (first press shows a prompt)
 - `0–9` jump to view
-- `h/l` or `←/→` previous/next view
 - `z` show/hide done (query rewrite)
 - `o` toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line
 - `/` enter live search (prefilled with current query + a trailing space); in the Projects list, `/` opens project filtering instead
@@ -142,7 +141,8 @@ Movement:
 - `Ctrl+U`/`Ctrl+D` half-page
 - `PgUp`/`PgDn` half-page (best-effort; depends on terminal-kit key mapping)
 - `:` go to line (row-number jump in task list)
-- `f` toggles fold/unfold on area headers, project headers, and tasks with children
+- `h`/`←` collapse current row; if already collapsed (or not foldable), go to parent
+- `l`/`→` expand current row; if already expanded, go to first child (when applicable)
 - `F` folds/unfolds everything
 
 Task actions:

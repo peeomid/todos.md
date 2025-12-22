@@ -314,7 +314,9 @@ function getFooterHelpLines(
   const globalFull = [
     '[j/k/↑/↓] move',
     '[g/G] top/bot',
-    '[h/l/←/→] views',
+    '[0–9] views',
+    '[h/←] collapse',
+    '[l/→] expand',
     '[/] search',
     '[z] show/hide done',
     '[o] pri order',
@@ -329,7 +331,8 @@ function getFooterHelpLines(
   if (view.kind === 'projects' && state.projects.drilldownProjectId) {
     const full = [
       '[Esc/Backspace] back',
-      '[f] fold',
+      '[h/←] collapse',
+      '[l/→] expand',
       '[F] fold all',
       '[:] goto line',
       '[space/x] done',
@@ -348,7 +351,8 @@ function getFooterHelpLines(
   }
 
   const tasksFull = [
-    '[f] fold',
+    '[h/←] collapse',
+    '[l/→] expand',
     '[F] fold all',
     '[:] goto line',
     '[space/x] done',
@@ -2270,18 +2274,6 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    // View navigation
-    if (!isProjectsList && (name === 'LEFT' || name === 'h')) {
-      setNextView(-1);
-      render(state, term);
-      return;
-    }
-    if (!isProjectsList && (name === 'RIGHT' || name === 'l')) {
-      setNextView(1);
-      render(state, term);
-      return;
-    }
-
     // Jump to view 0-9
     if (name.length === 1 && name >= '0' && name <= '9') {
       setViewByKey(name);
@@ -2347,6 +2339,164 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
     const listSize = isProjectsList ? state.filteredProjects.length : state.renderRows.length;
 
+    // Task list: tree navigation (collapse/expand).
+    // Convention:
+    // - Left/h: collapse current node, else go to parent
+    // - Right/l: expand current node, else go to first child
+    if (!isProjectsList && (name === 'LEFT' || name === 'h' || name === 'RIGHT' || name === 'l')) {
+      const isLeft = name === 'LEFT' || name === 'h';
+      const isRight = !isLeft;
+      const rowIndex = state.selection.row;
+      const row = state.renderRows[rowIndex];
+      if (!row) return;
+
+      const selectAndRender = (idx: number): void => {
+        selectRenderRow(clamp(idx, 0, Math.max(0, state.renderRows.length - 1)));
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+      };
+
+      const stayOnArea = (area: string): void => {
+        const idx = state.renderRows.findIndex((r) => r.kind === 'area' && r.area === area);
+        if (idx >= 0) selectRenderRow(idx);
+      };
+
+      const stayOnHeader = (projectId: string): void => {
+        const idx = state.renderRows.findIndex((r) => r.kind === 'header' && r.projectId === projectId);
+        if (idx >= 0) selectRenderRow(idx);
+      };
+
+      const stayOnTask = (taskId: string): void => {
+        const idx = state.renderRows.findIndex((r) => r.kind === 'task' && r.task.globalId === taskId);
+        if (idx >= 0) selectRenderRow(idx);
+      };
+
+      if (row.kind === 'area') {
+        if (isLeft) {
+          if (!state.collapsedAreas.has(row.area)) {
+            state.collapsedAreas.add(row.area);
+            recompute(state);
+            stayOnArea(row.area);
+            updateScrollForSelection(state.renderRows.length, listHeight);
+            render(state, term);
+          }
+          return;
+        }
+
+        // Right: expand, else go to first child row.
+        if (state.collapsedAreas.has(row.area)) {
+          state.collapsedAreas.delete(row.area);
+          recompute(state);
+          stayOnArea(row.area);
+          updateScrollForSelection(state.renderRows.length, listHeight);
+          render(state, term);
+          return;
+        }
+        if (rowIndex + 1 < state.renderRows.length) {
+          selectAndRender(rowIndex + 1);
+        }
+        return;
+      }
+
+      if (row.kind === 'header') {
+        if (isLeft) {
+          if (!state.collapsedProjects.has(row.projectId)) {
+            state.collapsedProjects.add(row.projectId);
+            recompute(state);
+            stayOnHeader(row.projectId);
+            updateScrollForSelection(state.renderRows.length, listHeight);
+            render(state, term);
+            return;
+          }
+
+          // Already collapsed: go to parent area (if this project is under an area heading).
+          const project = state.index.projects[row.projectId];
+          const areaKey = project?.parentArea ?? project?.area ?? null;
+          if (areaKey && state.index.areas?.[areaKey]) {
+            const areaIndex = state.renderRows.findIndex((r) => r.kind === 'area' && r.area === areaKey);
+            if (areaIndex >= 0) {
+              selectAndRender(areaIndex);
+            }
+          }
+          return;
+        }
+
+        // Right: expand, else go to first task row under this project.
+        if (state.collapsedProjects.has(row.projectId)) {
+          state.collapsedProjects.delete(row.projectId);
+          recompute(state);
+          stayOnHeader(row.projectId);
+          updateScrollForSelection(state.renderRows.length, listHeight);
+          render(state, term);
+          return;
+        }
+
+        for (let i = rowIndex + 1; i < state.renderRows.length; i++) {
+          const r = state.renderRows[i]!;
+          if (r.kind === 'area' || r.kind === 'header') break;
+          if (r.kind === 'task' && r.task.projectId === row.projectId) {
+            selectAndRender(i);
+            return;
+          }
+        }
+        return;
+      }
+
+      // row.kind === 'task'
+      const task = row.task;
+      const taskId = task.globalId;
+      const hasChildren = (task.childrenIds?.length ?? 0) > 0;
+
+      if (isLeft) {
+        if (hasChildren && !state.collapsedTasks.has(taskId)) {
+          state.collapsedTasks.add(taskId);
+          state.selection.selectedId = taskId;
+          recompute(state);
+          stayOnTask(taskId);
+          updateScrollForSelection(state.renderRows.length, listHeight);
+          render(state, term);
+          return;
+        }
+
+        const parentId = task.parentId ?? null;
+        if (parentId) {
+          const parentIndex = state.renderRows.findIndex((r) => r.kind === 'task' && r.task.globalId === parentId);
+          if (parentIndex >= 0) {
+            selectAndRender(parentIndex);
+            return;
+          }
+        }
+
+        const headerIndex = state.renderRows.findIndex((r) => r.kind === 'header' && r.projectId === task.projectId);
+        if (headerIndex >= 0) {
+          selectAndRender(headerIndex);
+        }
+        return;
+      }
+
+      // Right
+      if (hasChildren && state.collapsedTasks.has(taskId)) {
+        state.collapsedTasks.delete(taskId);
+        state.selection.selectedId = taskId;
+        recompute(state);
+        stayOnTask(taskId);
+        updateScrollForSelection(state.renderRows.length, listHeight);
+        render(state, term);
+        return;
+      }
+
+      if (hasChildren) {
+        for (let i = rowIndex + 1; i < state.renderRows.length; i++) {
+          const r = state.renderRows[i]!;
+          if (r.kind === 'task' && r.task.parentId === taskId) {
+            selectAndRender(i);
+            return;
+          }
+        }
+      }
+      return;
+    }
+
     // Task list: ":" go to line (vim-style)
     if (!isProjectsList && name === ':') {
       state.command.active = true;
@@ -2390,47 +2540,6 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         }
 
         recompute(state);
-        updateScrollForSelection(state.renderRows.length, listHeight);
-        render(state, term);
-      }
-      return;
-    }
-
-    // Task list: "f" toggles fold/unfold on the selected row
-    if (!isProjectsList && name === 'f') {
-      const row = state.renderRows[state.selection.row];
-      if (row?.kind === 'area') {
-        const area = row.area;
-        if (state.collapsedAreas.has(area)) state.collapsedAreas.delete(area);
-        else state.collapsedAreas.add(area);
-        recompute(state);
-        const areaIndex = state.renderRows.findIndex((r) => r.kind === 'area' && r.area === area);
-        if (areaIndex >= 0) selectRenderRow(areaIndex);
-        updateScrollForSelection(state.renderRows.length, listHeight);
-        render(state, term);
-      }
-      if (row?.kind === 'header') {
-        const projectId = row.projectId;
-        if (state.collapsedProjects.has(projectId)) state.collapsedProjects.delete(projectId);
-        else state.collapsedProjects.add(projectId);
-        recompute(state);
-        // Keep selection on the same header if it still exists.
-        const headerIndex = state.renderRows.findIndex((r) => r.kind === 'header' && r.projectId === projectId);
-        if (headerIndex >= 0) selectRenderRow(headerIndex);
-        updateScrollForSelection(state.renderRows.length, listHeight);
-        render(state, term);
-      }
-      if (row?.kind === 'task') {
-        const task = row.task;
-        const hasChildren = (task.childrenIds?.length ?? 0) > 0;
-        if (!hasChildren) return;
-        if (state.collapsedTasks.has(task.globalId)) state.collapsedTasks.delete(task.globalId);
-        else state.collapsedTasks.add(task.globalId);
-        // Preserve selection on the same task.
-        state.selection.selectedId = task.globalId;
-        recompute(state);
-        const taskIndex = state.renderRows.findIndex((r) => r.kind === 'task' && r.task.globalId === task.globalId);
-        if (taskIndex >= 0) selectRenderRow(taskIndex);
         updateScrollForSelection(state.renderRows.length, listHeight);
         render(state, term);
       }

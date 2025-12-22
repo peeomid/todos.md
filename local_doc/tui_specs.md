@@ -78,7 +78,7 @@ Rough layout:
 │ file: projects/autosenso.md:23                                              │
 │──────────────────────────────────────────────────────────────────────────────│
 │ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [n] now  [/] search   │
-│ [t] plan  [d] due  [a] add  [0–9] views  [z] show/hide done  [o] pri order  [q] quit │
+│ [t] plan  [d] due  [a] add  [h/←] collapse  [l/→] expand  [0–9] views  [q] quit     │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -212,8 +212,8 @@ Rendering rule (v1):
 * Project grouping:
   * `projectId — project name (count task(s))`
   * Headers are selectable.
-  * `f` toggles fold/unfold for the selected header (shows ▾/▸); folded projects hide their task rows.
-  * `f` also toggles fold/unfold for a selected task that has subtasks (shows ▾/▸); folded tasks hide all descendants in the list (even if sorting would otherwise place them elsewhere).
+  * `h` / `←` collapses the selected header/task (shows ▾/▸); if already collapsed (or not foldable), it goes to the parent.
+  * `l` / `→` expands the selected header/task; if already expanded, it goes to the first child (when applicable).
   * The task list shows a leftmost row-number column (1-based), and `:` opens a go-to-line prompt to jump to a specific row.
   * Projects that are in-scope for the current view (e.g. `project:` filters) may still be shown even if they have 0 matching tasks.
 
@@ -241,7 +241,7 @@ Requirements:
 * `query`: filter string.
 * `sort` (optional): comma-separated fields; fallback to default sort if missing.
 
-Custom views are part of the view cycle (`h/l` / left/right).
+Custom views can be jumped to by pressing their `key`.
 
 ---
 
@@ -254,8 +254,6 @@ Custom views are part of the view cycle (`h/l` / left/right).
 Help is always displayed at the bottom (below the details panel).
 * `r` – refresh (re-read `todos.json` without restarting; optional v2).
 * `0–9` – jump to specific view (0 = All, 1 = Today, etc.).
-* `h` / `←` – previous view.
-* `l` / `→` – next view.
 * `?` – show shorthand help (priority/bucket shorthands displayed in task rows).
 * `o` – toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line.
 
@@ -268,7 +266,8 @@ Help is always displayed at the bottom (below the details panel).
 * `Ctrl+U` / `PgUp` – half page up.
 * `Ctrl+D` / `PgDn` – half page down.
 * `:` – open “go to line” prompt; type a row number and press Enter to jump.
-* `f` – fold/unfold when the selection is on a project header row, or a task row with subtasks.
+* `h` / `←` – collapse current row; if already collapsed (or not foldable), go to parent.
+* `l` / `→` – expand current row; if already expanded, go to first child (when applicable).
 * `F` – fold/unfold everything.
 
 ---
