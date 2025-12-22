@@ -37,6 +37,7 @@ The tool follows patterns from [mcporter](https://github.com/steipete/mcporter).
 |----------|-------------|
 | `cli-architecture.md` | **Overall architecture**. Project structure, config resolution, ID system, index schema, dependencies. The main technical reference for implementation decisions. |
 | `cli-commands.md` | **Command summary**. Quick reference of all CLI commands with priorities (Tier 1-6). Start here to understand what commands exist. |
+| `local-dev-guide.md` | **Local dev**: run via `pnpm tmd`, build (`pnpm build`), and global install/link (`npm link` / `pnpm link --global`). |
 
 ### Interactive TUI (`tmd interactive`)
 

@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import type { ParsedAreaHeading, ParsedFile, ParsedProject, ParsedTask } from './types.js';
+import type { ParsedAreaHeading, ParsedFile, ParsedProject, ParsedSectionHeading, ParsedTask } from './types.js';
 import { parseFrontmatter } from './frontmatter.js';
 import { parseMetadataBlock } from './metadata-parser.js';
 
@@ -17,6 +17,7 @@ export function parseMarkdownContent(content: string, filePath: string): ParsedF
   const lines = contentWithoutFrontmatter.split('\n');
   const projects: ParsedProject[] = [];
   const areaHeadings: ParsedAreaHeading[] = [];
+  const sectionHeadings: ParsedSectionHeading[] = [];
   const tasks: ParsedTask[] = [];
 
   // Track line offset due to frontmatter removal
@@ -54,6 +55,13 @@ export function parseMarkdownContent(content: string, filePath: string): ParsedF
             headingLevel: hashes.length,
             metadata,
           });
+        } else if (!hasMetadata) {
+          sectionHeadings.push({
+            name: textWithoutMetadata.trim(),
+            filePath,
+            lineNumber,
+            headingLevel: hashes.length,
+          });
         }
       }
       continue;
@@ -87,6 +95,7 @@ export function parseMarkdownContent(content: string, filePath: string): ParsedF
     formatVersion: frontmatter.taskFormatVersion,
     projects,
     areaHeadings,
+    sectionHeadings,
     tasks,
   };
 }

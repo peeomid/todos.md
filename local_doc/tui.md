@@ -24,8 +24,9 @@
 - Project actions: in Projects view, `Ctrl+N` adds a new project and auto-switches into that project’s drilldown view
 - Rendering/grouping: task lists grouped by project headers (or `interactive.groupBy: "none"`)
 - Rendering/grouping: project drilldown still shows the project header even if it has 0 matching tasks in the current view
+- Rendering/grouping: organizational headings (no metadata) render as section headers inside project task lists (useful as separators like "Website", "Backlog", etc.)
 - Rendering: tasks in `bucket:now` use a distinct background color
-- Row shorthands: task rows show visual shorthands (priority `(A)/(B)/(C)` and bucket `*/!/>/~/?`) so users can learn them
+- Row shorthands: task rows show visual shorthands (priority `(A)/(B)/(C)` and bucket `*/!/>/~/?`) so users can learn them. These are **display-only** and derived from `priority:`/`bucket:` metadata; the TUI does not auto-insert shorthand tokens into the Markdown task text.
 - Header emphasis: the active query is highlighted in the header line
 - Safety: external edit detection via file `mtime` prompts before writing
 - Small screens: footer help auto-condenses (shows the most important keys and an ellipsis), and `?` opens a scrollable help overlay with keybindings + shorthands
@@ -41,10 +42,11 @@
 - 2025-12-20: Adding: `a` opens a 3-field add modal (Project + Text + Meta) with the same autocomplete semantics and shared suggestion UI.
 - 2025-12-20: Input fields now support cursor movement + word/line jumps (arrows/Home/End, Ctrl+A/E, Option+←/→/Backspace, Ctrl+U/K). Add-task project field shows `projectId — project name` when selected. Projects view shows aligned `id — name` (no file paths).
 - 2025-12-20: Added `bucket:now` (working on right now): new built-in `Now` view (`1`) + `n` toggles now on/off for the selected task.
-- 2025-12-22: Rekeyed built-in views (`0` All, `1` Now, `2` Today, …, `6` Projects), moved plan hotkey to `t`, and added `*`/`@now` shorthands for `bucket:now`.
+- 2025-12-22: Rekeyed built-in views (`0` All, `1` Now, `2` Today, …, `6` Projects), moved plan hotkey to `t`, and added `*`/`@now` shorthands for `bucket:now` (recognized by `enrich` + shown in TUI).
 - 2025-12-22: Task list improvements: row-number column, `:` go-to-line, selectable + foldable headers, clearer subtask indentation, and `bucket:now` background highlight.
 - 2025-12-22: Rekeyed folding/tree navigation: `h/l` or `←/→` collapse/expand; removed `f`; kept `F` for fold/unfold all.
 - 2025-12-22: Projects list improvements: `/` activates type-to-filter, with arrow-only navigation (vim keys disabled in that list).
 - 2025-12-22: Added area-heading grouping in task lists (e.g. `# Work [area:work]` appears above its projects when there are matching tasks in the current view).
+- 2025-12-22: Added project section headings in task lists: organizational headings without metadata (e.g. `### Website`) render as collapsible separators under their project.
 - 2025-12-22: Added fold/unfold-all (`F`) and `o` priority-order toggle; current priority order is shown in the header flags (next to hide/show done).
 - 2025-12-22: Fixed priority ordering toggle applying in all views (not just single-project drilldown).

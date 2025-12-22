@@ -3,13 +3,14 @@ import { decideAddTargetProjectId } from '../../src/tui/add-target.js';
 
 function makeIndex(projectIds: string[]) {
   return {
-    version: 2,
+    version: 3,
     generatedAt: '2025-12-19',
     files: ['todos.md'],
     areas: {},
     projects: Object.fromEntries(
       projectIds.map((id) => [id, { id, name: id.toUpperCase(), filePath: 'todos.md', lineNumber: 1 }])
     ),
+    sections: {},
     tasks: {},
   } as any;
 }

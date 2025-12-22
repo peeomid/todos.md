@@ -89,11 +89,12 @@ function runInit(options: InitOptions): void {
 
   if (withIndex) {
     const index: TaskIndex = {
-      version: 2,
+      version: 3,
       generatedAt: new Date().toISOString(),
       files: [file],
       areas: {},
       projects: {},
+      sections: {},
       tasks: {},
     };
     plannedWrites.push({ path: output, contents: JSON.stringify(index, null, 2) + '\n' });

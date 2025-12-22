@@ -141,6 +141,7 @@ Headings without any metadata are purely organizational:
 * `### Current Sprint` and `### Backlog` have no `[...]` block
 * They're just organizational groupings
 * Tasks still belong to `acme` (nearest heading with `project:`)
+* In `tmd interactive`, these headings are indexed as **section headings** and can render as collapsible separators inside the project task list.
 
 ### 2.5. Multi-level heading hierarchies
 

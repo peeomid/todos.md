@@ -1,16 +1,18 @@
-import type { AreaHeading, TaskIndex, Task, Project } from '../schema/index.js';
+import type { AreaHeading, SectionHeading, TaskIndex, Task, Project } from '../schema/index.js';
 import {
   parseMarkdownFile,
   buildHierarchy,
   type TaskWithHierarchy,
   type ParsedProject,
   type ParsedAreaHeading,
+  type ParsedSectionHeading,
 } from '../parser/index.js';
 import type { IndexerResult, IndexStats, IndexWarning } from './types.js';
 
 export function buildIndex(filePaths: string[]): IndexerResult {
   const areas: Record<string, AreaHeading> = {};
   const projects: Record<string, Project> = {};
+  const sections: Record<string, SectionHeading> = {};
   const tasks: Record<string, Task> = {};
   const warnings: IndexWarning[] = [];
 
@@ -21,6 +23,7 @@ export function buildIndex(filePaths: string[]): IndexerResult {
   for (const filePath of filePaths) {
     const parsed = parseMarkdownFile(filePath);
     const tasksWithHierarchy = buildHierarchy(parsed);
+    const sectionsWithProject = buildSections(parsed);
 
     // Add area headings (for grouping + inherited area context)
     for (const h of parsed.areaHeadings) {
@@ -40,6 +43,19 @@ export function buildIndex(filePaths: string[]): IndexerResult {
       }
       const parentArea = findParentAreaForProject(project, parsed.areaHeadings);
       projects[project.id] = projectFromParsed(project, parentArea);
+    }
+
+    // Add section headings (organizational headings without metadata, within a project context)
+    for (const section of sectionsWithProject) {
+      if (sections[section.id]) {
+        warnings.push({
+          file: filePath,
+          line: section.lineNumber,
+          message: `Duplicate section ID '${section.id}'`,
+        });
+        continue;
+      }
+      sections[section.id] = section;
     }
 
     // Add tasks
@@ -99,11 +115,12 @@ export function buildIndex(filePaths: string[]): IndexerResult {
   }
 
   const index: TaskIndex = {
-    version: 2,
+    version: 3,
     generatedAt: new Date().toISOString(),
     files: filePaths,
     areas,
     projects,
+    sections,
     tasks,
   };
 
@@ -118,6 +135,67 @@ export function buildIndex(filePaths: string[]): IndexerResult {
   };
 
   return { index, stats, warnings };
+}
+
+function buildSections(parsedFile: {
+  filePath: string;
+  projects: ParsedProject[];
+  sectionHeadings: ParsedSectionHeading[];
+}): SectionHeading[] {
+  const sortedProjects = [...parsedFile.projects].sort((a, b) => a.lineNumber - b.lineNumber);
+  const sectionHeadings = [...parsedFile.sectionHeadings].sort((a, b) => a.lineNumber - b.lineNumber);
+
+  const byProject: Record<string, SectionHeading[]> = {};
+  for (const h of sectionHeadings) {
+    let projectId: string | null = null;
+    for (const project of sortedProjects) {
+      if (project.lineNumber < h.lineNumber) projectId = project.id;
+      else break;
+    }
+    if (!projectId) continue;
+
+    const id = makeSectionId(projectId, parsedFile.filePath, h.lineNumber, h.headingLevel);
+    const section: SectionHeading = {
+      id,
+      projectId,
+      name: h.name,
+      filePath: parsedFile.filePath,
+      lineNumber: h.lineNumber,
+      headingLevel: h.headingLevel,
+      parentId: null,
+    };
+    (byProject[projectId] ??= []).push(section);
+  }
+
+  // Establish parent/child relationships per project (markdown heading nesting by level).
+  for (const list of Object.values(byProject)) {
+    list.sort((a, b) => a.lineNumber - b.lineNumber);
+    const stack: Array<{ level: number; id: string }> = [];
+
+    for (const s of list) {
+      while (stack.length > 0 && stack[stack.length - 1]!.level >= s.headingLevel) {
+        stack.pop();
+      }
+      s.parentId = stack.length > 0 ? stack[stack.length - 1]!.id : null;
+      stack.push({ level: s.headingLevel, id: s.id });
+    }
+  }
+
+  return Object.values(byProject).flat();
+}
+
+function hash32Base36(input: string): string {
+  // FNV-1a 32-bit (small + deterministic; avoids filePath keys bloating ids)
+  let h = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+function makeSectionId(projectId: string, filePath: string, lineNumber: number, headingLevel: number): string {
+  return `sec:${projectId}:${hash32Base36(filePath)}:${lineNumber}:${headingLevel}`;
 }
 
 function findParentAreaForProject(project: ParsedProject, areaHeadings: ParsedAreaHeading[]): string | undefined {

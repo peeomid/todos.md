@@ -47,6 +47,6 @@ describe('tmd init command', () => {
     expect(fs.existsSync(indexPath)).toBe(true);
 
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as { version: number };
-    expect(index.version).toBe(2);
+    expect(index.version).toBe(3);
   });
 });

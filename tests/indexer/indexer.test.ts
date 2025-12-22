@@ -28,7 +28,7 @@ describe('buildIndex', () => {
 
     const { index, stats } = buildIndex([TEST_FILE]);
 
-    expect(index.version).toBe(2);
+    expect(index.version).toBe(3);
     expect(Object.keys(index.projects)).toHaveLength(1);
     expect(Object.keys(index.tasks)).toHaveLength(2);
     expect(stats.tasks.total).toBe(2);
@@ -67,6 +67,29 @@ describe('buildIndex', () => {
     expect(index.projects.a?.area).toBe('work');
     expect(index.projects.a?.parentArea).toBe('work');
     expect(index.tasks['a:1']?.area).toBe('work');
+  });
+
+  it('indexes organizational section headings within a project', () => {
+    fs.writeFileSync(
+      TEST_FILE,
+      `# Work [area:work]
+
+## Project A [project:a]
+
+### Current Sprint
+- [ ] Task 1 [id:1]
+
+### Backlog
+- [ ] Task 2 [id:2]`
+    );
+
+    const { index } = buildIndex([TEST_FILE]);
+    const sectionNames = Object.values(index.sections)
+      .filter((s) => s.projectId === 'a')
+      .map((s) => s.name)
+      .sort();
+
+    expect(sectionNames).toEqual(['Backlog', 'Current Sprint']);
   });
 
   it('warns on duplicate global IDs', () => {

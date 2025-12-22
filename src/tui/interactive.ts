@@ -88,6 +88,7 @@ interface SessionState {
   projects: { drilldownProjectId: string | null };
   projectsList: { active: boolean; input: TextInputState; staged: TextInputState };
   collapsedProjects: Set<string>;
+  collapsedSections: Set<string>;
   collapsedTasks: Set<string>;
   collapsedAreas: Set<string>;
   fileMtimes: Map<string, number>;
@@ -103,7 +104,8 @@ interface SessionState {
 type RenderRow =
   | { kind: 'area'; area: string; label: string; count: number }
   | { kind: 'header'; projectId: string; label: string; count: number; indent: number }
-  | { kind: 'task'; task: Task; indent: number };
+  | { kind: 'section'; sectionId: string; projectId: string; label: string; count: number; indent: number }
+  | { kind: 'task'; task: Task; indent: number; sectionId: string | null };
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0]!;
@@ -672,6 +674,21 @@ function render(state: SessionState, term: Term): void {
           term.bold.cyan(label);
           if (pad > 0) term(' '.repeat(pad));
         }
+      } else if (r.kind === 'section') {
+        const icon = state.collapsedSections.has(r.sectionId) ? '▸' : '▾';
+        const indentPrefix = '  '.repeat(r.indent);
+        const labelMax = Math.max(0, contentWidth);
+        const label = truncateByWidth(`${indentPrefix}${icon} ${r.label}`, labelMax);
+        const pad = Math.max(0, contentWidth - terminalKit.stringWidth(label));
+        if (state.colorsDisabled) {
+          term(label);
+          if (pad > 0) term(' '.repeat(pad));
+        } else {
+          term.styleReset();
+          if (selected) term.inverse();
+          term.bold(label);
+          if (pad > 0) term(' '.repeat(pad));
+        }
       } else {
         const t = r.task;
         const structuralIndent = '  '.repeat(r.indent);
@@ -1000,11 +1017,13 @@ function recompute(state: SessionState): void {
   const prevRow = state.renderRows[state.selection.row];
   const prevHeaderProjectId = prevRow?.kind === 'header' ? prevRow.projectId : null;
   const prevArea = prevRow?.kind === 'area' ? prevRow.area : null;
+  const prevSectionId = prevRow?.kind === 'section' ? prevRow.sectionId : null;
   const prevTaskProjectId = prevSelectedId ? state.index.tasks[prevSelectedId]?.projectId ?? null : null;
   state.renderRows = [];
 
   const areaRowIndexByArea = new Map<string, number>();
   const headerRowIndexByProjectId = new Map<string, number>();
+  const sectionRowIndexById = new Map<string, number>();
   const taskRowIndexById = new Map<string, number>();
 
   if (state.groupBy === 'project') {
@@ -1021,6 +1040,133 @@ function recompute(state: SessionState): void {
         current = parent?.parentId ?? null;
       }
       return false;
+    };
+
+    const pushProjectTaskRows = (projectId: string, group: Task[], baseIndent: number): void => {
+      const projectSections = Object.values(state.index.sections).filter((s) => s.projectId === projectId);
+      if (projectSections.length === 0) {
+        for (const task of group) {
+          if (isHiddenByCollapsedAncestor(task)) continue;
+          const idx = state.renderRows.length;
+          state.renderRows.push({ kind: 'task', task, indent: baseIndent, sectionId: null });
+          taskRowIndexById.set(task.globalId, idx);
+        }
+        return;
+      }
+
+      const sectionsByFile = new Map<string, Array<(typeof projectSections)[number]>>();
+      const childrenByParent = new Map<string | null, string[]>();
+      const sectionById = new Map<string, (typeof projectSections)[number]>();
+
+      for (const s of projectSections) {
+        sectionById.set(s.id, s);
+        const arr = sectionsByFile.get(s.filePath) ?? [];
+        arr.push(s);
+        sectionsByFile.set(s.filePath, arr);
+        const p = s.parentId ?? null;
+        const c = childrenByParent.get(p) ?? [];
+        c.push(s.id);
+        childrenByParent.set(p, c);
+      }
+
+      for (const [file, arr] of sectionsByFile.entries()) {
+        arr.sort((a, b) => a.lineNumber - b.lineNumber);
+        sectionsByFile.set(file, arr);
+      }
+      for (const [p, ids] of childrenByParent.entries()) {
+        ids.sort((a, b) => {
+          const aa = sectionById.get(a)?.lineNumber ?? 0;
+          const bb = sectionById.get(b)?.lineNumber ?? 0;
+          return aa - bb;
+        });
+        childrenByParent.set(p, ids);
+      }
+
+      const findSectionIdForTask = (task: Task): string | null => {
+        const arr = sectionsByFile.get(task.filePath);
+        if (!arr || arr.length === 0) return null;
+        let lo = 0;
+        let hi = arr.length - 1;
+        let best = -1;
+        while (lo <= hi) {
+          const mid = (lo + hi) >> 1;
+          const m = arr[mid]!;
+          if (m.lineNumber < task.lineNumber) {
+            best = mid;
+            lo = mid + 1;
+          } else {
+            hi = mid - 1;
+          }
+        }
+        return best >= 0 ? arr[best]!.id : null;
+      };
+
+      const tasksBySection = new Map<string | null, Task[]>();
+      for (const task of group) {
+        if (isHiddenByCollapsedAncestor(task)) continue;
+        const sectionId = findSectionIdForTask(task);
+        const arr = tasksBySection.get(sectionId) ?? [];
+        arr.push(task);
+        tasksBySection.set(sectionId, arr);
+      }
+
+      const depthBySection = new Map<string, number>();
+      const getSectionDepth = (sectionId: string): number => {
+        if (depthBySection.has(sectionId)) return depthBySection.get(sectionId)!;
+        const parentId = sectionById.get(sectionId)?.parentId ?? null;
+        const depth = parentId ? getSectionDepth(parentId) + 1 : 0;
+        depthBySection.set(sectionId, depth);
+        return depth;
+      };
+
+      const totalCountBySection = new Map<string, number>();
+      const computeTotal = (sectionId: string): number => {
+        if (totalCountBySection.has(sectionId)) return totalCountBySection.get(sectionId)!;
+        const own = tasksBySection.get(sectionId)?.length ?? 0;
+        const childIds = childrenByParent.get(sectionId) ?? [];
+        const childTotal = childIds.reduce((sum, cid) => sum + computeTotal(cid), 0);
+        const total = own + childTotal;
+        totalCountBySection.set(sectionId, total);
+        return total;
+      };
+      for (const id of sectionById.keys()) computeTotal(id);
+
+      // Render tasks that have no section heading above them.
+      for (const task of tasksBySection.get(null) ?? []) {
+        const idx = state.renderRows.length;
+        state.renderRows.push({ kind: 'task', task, indent: baseIndent, sectionId: null });
+        taskRowIndexById.set(task.globalId, idx);
+      }
+
+      const renderSection = (sectionId: string): void => {
+        const section = sectionById.get(sectionId);
+        if (!section) return;
+        const count = totalCountBySection.get(sectionId) ?? 0;
+        if (count <= 0) return;
+        const depth = getSectionDepth(sectionId);
+        const sectionIndent = baseIndent + depth;
+        const taskIndent = sectionIndent + 1;
+        const label = `${section.name} (${count} task${count === 1 ? '' : 's'})`;
+        const idx = state.renderRows.length;
+        state.renderRows.push({ kind: 'section', sectionId, projectId, label, count, indent: sectionIndent });
+        sectionRowIndexById.set(sectionId, idx);
+
+        if (state.collapsedSections.has(sectionId)) return;
+
+        // Prefer rendering child sections first (outline-style), then tasks directly under this section.
+        for (const cid of childrenByParent.get(sectionId) ?? []) {
+          renderSection(cid);
+        }
+        for (const task of tasksBySection.get(sectionId) ?? []) {
+          const tIdx = state.renderRows.length;
+          state.renderRows.push({ kind: 'task', task, indent: taskIndent, sectionId });
+          taskRowIndexById.set(task.globalId, tIdx);
+        }
+      };
+
+      for (const rootId of childrenByParent.get(null) ?? []) {
+        renderSection(rootId);
+      }
     };
 
     const explicitProjectId =
@@ -1084,12 +1230,8 @@ function recompute(state: SessionState): void {
         headerRowIndexByProjectId.set(projectId, headerIdx);
 
         if (state.collapsedProjects.has(projectId)) continue;
-        for (const task of group) {
-          if (isHiddenByCollapsedAncestor(task)) continue;
-          const idx = state.renderRows.length;
-          state.renderRows.push({ kind: 'task', task, indent: 2 });
-          taskRowIndexById.set(task.globalId, idx);
-        }
+        // Project header is indented by 1 under area headers, so tasks/sections start at 2.
+        pushProjectTaskRows(projectId, group, 2);
       }
     }
 
@@ -1110,17 +1252,13 @@ function recompute(state: SessionState): void {
       headerRowIndexByProjectId.set(projectId, headerIdx);
 
       if (state.collapsedProjects.has(projectId)) continue;
-      for (const task of group) {
-        if (isHiddenByCollapsedAncestor(task)) continue;
-        const idx = state.renderRows.length;
-        state.renderRows.push({ kind: 'task', task, indent: 0 });
-        taskRowIndexById.set(task.globalId, idx);
-      }
+      // In ungrouped mode, tasks/sections should still be visually nested under the project header.
+      pushProjectTaskRows(projectId, group, 1);
     }
   } else {
     for (const task of tasks) {
       const idx = state.renderRows.length;
-      state.renderRows.push({ kind: 'task', task, indent: 0 });
+      state.renderRows.push({ kind: 'task', task, indent: 0, sectionId: null });
       taskRowIndexById.set(task.globalId, idx);
     }
   }
@@ -1129,22 +1267,29 @@ function recompute(state: SessionState): void {
     state.selection.row = taskRowIndexById.get(prevSelectedId)!;
     state.selection.selectedId = prevSelectedId;
   } else {
-    const headerFallback = prevHeaderProjectId ?? prevTaskProjectId;
-    if (headerFallback && headerRowIndexByProjectId.has(headerFallback)) {
-      state.selection.row = headerRowIndexByProjectId.get(headerFallback)!;
-      state.selection.selectedId = null;
-    } else if (prevArea && areaRowIndexByArea.has(prevArea)) {
-      state.selection.row = areaRowIndexByArea.get(prevArea)!;
+    if (prevSectionId && sectionRowIndexById.has(prevSectionId)) {
+      state.selection.row = sectionRowIndexById.get(prevSectionId)!;
       state.selection.selectedId = null;
     } else {
-      const firstTaskRow = state.renderRows.findIndex((r) => r.kind === 'task');
-      if (firstTaskRow >= 0) {
-        state.selection.row = firstTaskRow;
-        const row = state.renderRows[firstTaskRow] as Extract<RenderRow, { kind: 'task' }>;
-        state.selection.selectedId = row.task.globalId;
+      const headerFallback = prevHeaderProjectId ?? prevTaskProjectId;
+      if (headerFallback && headerRowIndexByProjectId.has(headerFallback)) {
+      state.selection.row = headerRowIndexByProjectId.get(headerFallback)!;
+      state.selection.selectedId = null;
       } else {
-        state.selection.row = 0;
-        state.selection.selectedId = null;
+        if (prevArea && areaRowIndexByArea.has(prevArea)) {
+          state.selection.row = areaRowIndexByArea.get(prevArea)!;
+          state.selection.selectedId = null;
+        } else {
+          const firstTaskRow = state.renderRows.findIndex((r) => r.kind === 'task');
+          if (firstTaskRow >= 0) {
+            state.selection.row = firstTaskRow;
+            const row = state.renderRows[firstTaskRow] as Extract<RenderRow, { kind: 'task' }>;
+            state.selection.selectedId = row.task.globalId;
+          } else {
+            state.selection.row = 0;
+            state.selection.selectedId = null;
+          }
+        }
       }
     }
   }
@@ -1369,6 +1514,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     projects: { drilldownProjectId: null },
     projectsList: { active: false, input: createTextInput(''), staged: createTextInput('') },
     collapsedProjects: new Set<string>(),
+    collapsedSections: new Set<string>(),
     collapsedTasks: new Set<string>(),
     collapsedAreas: new Set<string>(),
     fileMtimes: getFileMtimes(options.index),
@@ -2371,6 +2517,11 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         if (idx >= 0) selectRenderRow(idx);
       };
 
+      const stayOnSection = (sectionId: string): void => {
+        const idx = state.renderRows.findIndex((r) => r.kind === 'section' && r.sectionId === sectionId);
+        if (idx >= 0) selectRenderRow(idx);
+      };
+
       if (row.kind === 'area') {
         if (isLeft) {
           if (!state.collapsedAreas.has(row.area)) {
@@ -2434,7 +2585,62 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         for (let i = rowIndex + 1; i < state.renderRows.length; i++) {
           const r = state.renderRows[i]!;
           if (r.kind === 'area' || r.kind === 'header') break;
+          if (r.kind === 'section' && r.projectId === row.projectId) {
+            selectAndRender(i);
+            return;
+          }
           if (r.kind === 'task' && r.task.projectId === row.projectId) {
+            selectAndRender(i);
+            return;
+          }
+        }
+        return;
+      }
+
+      if (row.kind === 'section') {
+        const sectionId = row.sectionId;
+
+        if (isLeft) {
+          if (!state.collapsedSections.has(sectionId)) {
+            state.collapsedSections.add(sectionId);
+            recompute(state);
+            stayOnSection(sectionId);
+            updateScrollForSelection(state.renderRows.length, listHeight);
+            render(state, term);
+            return;
+          }
+
+          // Already collapsed: go to parent section, else project header.
+          const parentId = state.index.sections[sectionId]?.parentId ?? null;
+          if (parentId) {
+            const parentIndex = state.renderRows.findIndex((r) => r.kind === 'section' && r.sectionId === parentId);
+            if (parentIndex >= 0) {
+              selectAndRender(parentIndex);
+              return;
+            }
+          }
+          const headerIndex = state.renderRows.findIndex((r) => r.kind === 'header' && r.projectId === row.projectId);
+          if (headerIndex >= 0) selectAndRender(headerIndex);
+          return;
+        }
+
+        // Right: expand, else go to first child row (section or task) under this section.
+        if (state.collapsedSections.has(sectionId)) {
+          state.collapsedSections.delete(sectionId);
+          recompute(state);
+          stayOnSection(sectionId);
+          updateScrollForSelection(state.renderRows.length, listHeight);
+          render(state, term);
+          return;
+        }
+
+        for (let i = rowIndex + 1; i < state.renderRows.length; i++) {
+          const r = state.renderRows[i]!;
+          if (r.kind === 'area' || r.kind === 'header') break;
+          if (r.kind === 'section' && r.sectionId === sectionId) continue;
+          // Stop when we reach a sibling/ancestor section (same or less indent).
+          if (r.kind === 'section' && r.indent <= row.indent) break;
+          if (r.kind === 'section' || r.kind === 'task') {
             selectAndRender(i);
             return;
           }
@@ -2463,6 +2669,15 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
           const parentIndex = state.renderRows.findIndex((r) => r.kind === 'task' && r.task.globalId === parentId);
           if (parentIndex >= 0) {
             selectAndRender(parentIndex);
+            return;
+          }
+        }
+
+        const sectionId = row.sectionId ?? null;
+        if (sectionId) {
+          const sectionIndex = state.renderRows.findIndex((r) => r.kind === 'section' && r.sectionId === sectionId);
+          if (sectionIndex >= 0) {
+            selectAndRender(sectionIndex);
             return;
           }
         }
@@ -2511,31 +2726,36 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     if (!isProjectsList && name === 'F') {
       const areaKeys = new Set<string>();
       const projectIds = new Set<string>();
+      const sectionIds = new Set<string>();
       const taskIds = new Set<string>();
 
       for (const row of state.renderRows) {
         if (row.kind === 'area') areaKeys.add(row.area);
         if (row.kind === 'header') projectIds.add(row.projectId);
+        if (row.kind === 'section') sectionIds.add(row.sectionId);
         if (row.kind === 'task') {
           const hasChildren = (row.task.childrenIds?.length ?? 0) > 0;
           if (hasChildren) taskIds.add(row.task.globalId);
         }
       }
 
-      const foldableCount = areaKeys.size + projectIds.size + taskIds.size;
+      const foldableCount = areaKeys.size + projectIds.size + sectionIds.size + taskIds.size;
       if (foldableCount > 0) {
         const allCollapsed =
           [...areaKeys].every((a) => state.collapsedAreas.has(a)) &&
           [...projectIds].every((p) => state.collapsedProjects.has(p)) &&
+          [...sectionIds].every((s) => state.collapsedSections.has(s)) &&
           [...taskIds].every((t) => state.collapsedTasks.has(t));
 
         if (allCollapsed) {
           state.collapsedAreas.clear();
           state.collapsedProjects.clear();
+          state.collapsedSections.clear();
           state.collapsedTasks.clear();
         } else {
           for (const a of areaKeys) state.collapsedAreas.add(a);
           for (const p of projectIds) state.collapsedProjects.add(p);
+          for (const s of sectionIds) state.collapsedSections.add(s);
           for (const t of taskIds) state.collapsedTasks.add(t);
         }
 

@@ -101,6 +101,7 @@ Use a small, meaningful color palette:
 
  * Priority (first token after checkbox): `(A)` high, `(B)` normal, `(C)` low
 * Bucket (next token, after optional priority): `*` now, `!` today, `>` upcoming, `~` anytime, `?` someday
+ * Note: these shorthands are **rendered by the TUI** from `priority:`/`bucket:` metadata; the TUI does not automatically write shorthand tokens back into the Markdown task text.
 * **Task text vs metadata**:
 
  * Task text: normal/bright.
@@ -207,6 +208,7 @@ Rendering rule (v1):
 * All task lists (Today/Upcoming/Anytime/Someday/All and project drilldown) are grouped hierarchically:
   * If present in the Markdown, **area headings** (headings with `area:` but no `project:`) render as a parent header row above their projects.
   * Projects render as a header row under the area header (if any).
+  * Within a project, **organizational headings** (plain Markdown headings with no `[...]` metadata) render as section header rows under the project.
   * Tasks render under their project header.
   * Area headers are shown in **every view**, but only when they have ≥1 matching task in that view (no “empty” area headers).
 * Project grouping:

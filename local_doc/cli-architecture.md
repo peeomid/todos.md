@@ -246,7 +246,7 @@ When adding a new task:
 
 ```typescript
 interface TaskIndex {
-  version: 2;
+  version: 3;
   generatedAt: string;           // ISO timestamp
   files: string[];               // List of source files
 
@@ -268,6 +268,18 @@ interface TaskIndex {
       parentArea?: string;       // Nearest area-only heading above the project (if any)
       filePath: string;
       lineNumber: number;
+    };
+  };
+
+  sections: {
+    [sectionId: string]: {
+      id: string;                // e.g. "sec:sy:abc123:12:3"
+      projectId: string;         // "sy"
+      name: string;              // Heading text (e.g. "Website - Company Page (Priority)")
+      filePath: string;
+      lineNumber: number;
+      headingLevel: number;
+      parentId: string | null;   // Parent sectionId (for nested headings)
     };
   };
 

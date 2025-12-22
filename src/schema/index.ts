@@ -25,6 +25,17 @@ export const AreaHeadingSchema = z.object({
 });
 export type AreaHeading = z.infer<typeof AreaHeadingSchema>;
 
+export const SectionHeadingSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string(),
+  filePath: z.string(),
+  lineNumber: z.number(),
+  headingLevel: z.number(),
+  parentId: z.string().nullable(),
+});
+export type SectionHeading = z.infer<typeof SectionHeadingSchema>;
+
 export const TaskSchema = z.object({
   globalId: z.string(),
   localId: z.string(),
@@ -56,12 +67,13 @@ export const TaskSchema = z.object({
 export type Task = z.infer<typeof TaskSchema>;
 
 export const TaskIndexSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   generatedAt: z.string(),
   files: z.array(z.string()),
 
   areas: z.record(z.string(), AreaHeadingSchema),
   projects: z.record(z.string(), ProjectSchema),
+  sections: z.record(z.string(), SectionHeadingSchema),
   tasks: z.record(z.string(), TaskSchema),
 });
 export type TaskIndex = z.infer<typeof TaskIndexSchema>;

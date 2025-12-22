@@ -17,6 +17,13 @@ export interface ParsedAreaHeading {
   metadata: Record<string, string>;
 }
 
+export interface ParsedSectionHeading {
+  name: string;
+  filePath: string;
+  lineNumber: number;
+  headingLevel: number;
+}
+
 export interface ParsedTask {
   localId: string | null;
   text: string;
@@ -33,6 +40,7 @@ export interface ParsedFile {
   formatVersion?: number;
   projects: ParsedProject[];
   areaHeadings: ParsedAreaHeading[];
+  sectionHeadings: ParsedSectionHeading[];
   tasks: ParsedTask[];
 }
 

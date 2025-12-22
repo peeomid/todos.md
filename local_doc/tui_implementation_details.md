@@ -115,6 +115,7 @@ Rendering:
 - Full-screen redraw on every state change (simple + reliable)
 - Resize handler recomputes list height and scroll window
 - Task lists are rendered as `renderRows` (area headers + project headers + task rows); headers are selectable and can be folded/unfolded (area/project/task collapse state stored in session state).
+- Task lists are rendered as `renderRows` (area headers + project headers + section headers + task rows); section headers come from organizational headings (no metadata) in Markdown and can be folded/unfolded (area/project/section/task collapse state stored in session state).
 - Task rows display bucket + priority shorthands to help users learn the todo-format shorthands:
   - priority: `(A)/(B)/(C)` (high/normal/low)
   - bucket: `*/!/>/~/?` (now/today/upcoming/anytime/someday)
