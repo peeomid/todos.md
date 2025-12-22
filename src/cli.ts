@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { printHelp, printVersion } from './cli/help.js';
+import { printHelpTopic, printHelpTopicsIndex } from './cli/help-topics.js';
 import { handleIndexCommand, printIndexHelp } from './cli/index-command.js';
 import { handleLintCommand, printLintHelp } from './cli/lint-command.js';
 import { handleEnrichCommand, printEnrichHelp } from './cli/enrich-command.js';
@@ -56,7 +57,20 @@ async function main(): Promise<void> {
   try {
     switch (command) {
       case 'help':
-        printHelp();
+        if (args.length === 0) {
+          printHelp();
+          break;
+        }
+        if (args[0] === 'topics') {
+          printHelpTopicsIndex();
+          break;
+        }
+        if (!printHelpTopic(args[0] ?? '')) {
+          console.error(`Unknown help topic '${args[0]}'.`);
+          console.error('');
+          printHelpTopicsIndex();
+          process.exit(1);
+        }
         break;
 
       case 'lint':

@@ -29,7 +29,24 @@ npx tsx src/cli.ts index -f ~/path/to/your/todos.md
 
 ## 2. Build and Install CLI on Your System
 
-### Step 1: Build the project
+### Recommended: one command (build + global link)
+
+```bash
+./script/build-and-link-global.sh
+tmd --help
+```
+
+You can force the package manager:
+
+```bash
+./script/build-and-link-global.sh --pm pnpm
+./script/build-and-link-global.sh --pm npm
+```
+
+Notes:
+- If pnpm global linking isn't configured, the script prints setup guidance and falls back to `npm link` automatically (unless you force `--pm pnpm`).
+
+### Manual: Build the project
 
 ```bash
 cd /path/to/todosmd
@@ -62,6 +79,26 @@ pnpm link --global
 tmd --help
 tmd list -f ~/todos/work.md
 ```
+
+#### If `pnpm link --global` fails with `ERR_PNPM_NO_GLOBAL_BIN_DIR`
+
+Some environments (common with Node installed via `nvm`) don’t have pnpm’s global bin dir configured by default.
+
+```bash
+# Inspect current pnpm global bin dir (often prints "undefined" when misconfigured)
+pnpm config get global-bin-dir
+
+# macOS default (recommended)
+pnpm config set global-bin-dir "$HOME/Library/pnpm"
+
+# Ensure it's on PATH (add to ~/.zshrc or ~/.bashrc as needed)
+export PATH="$HOME/Library/pnpm:$PATH"
+
+# Retry
+pnpm link --global
+```
+
+If you don’t want to deal with pnpm globals, use `npm link` instead (it works well with `nvm`).
 
 ### To unlink later
 

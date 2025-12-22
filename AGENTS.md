@@ -5,6 +5,7 @@
 pnpm tmd <cmd> --help  # Command help
 pnpm test              # Run tests
 pnpm typecheck         # Type check
+./script/build-and-link-global.sh  # Build + link `tmd` globally
 ```
 
 ## Documentation (local_doc/)
@@ -14,6 +15,7 @@ pnpm typecheck         # Type check
 | `plan.md` | **Current progress** - what's done, what's next |
 | `cli-commands.md` | **Command summary** - all commands with status |
 | `cli-architecture.md` | **Architecture** - project structure, config, ID system, index schema |
+| `local-dev-guide.md` | **Local dev** - run via `pnpm tmd`, build (`pnpm build`), and global install/link (`npm link` / `pnpm link --global`). |
 | `todo-format-spec.md` | **Task format** - markdown syntax, metadata keys, shorthands |
 | `commands/*.md` | **Command specs** - detailed spec per command |
 | `tui.md` | **TUI overview** - interactive mode summary and UX notes |

@@ -8,7 +8,7 @@ export interface ShorthandResult {
   bucket?: string;
   plan?: string; // Only for today shorthands
   cleanedText: string; // Text with shorthand removed
-  shorthandType?: '!' | '>' | '~' | '?' | '@today' | '@upcoming' | '@anytime' | '@someday';
+  shorthandType?: '*' | '!' | '>' | '~' | '?' | '@now' | '@today' | '@upcoming' | '@anytime' | '@someday';
   priorityShorthand?: '(A)' | '(B)' | '(C)';
 }
 

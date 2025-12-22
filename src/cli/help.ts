@@ -1,4 +1,5 @@
 import { boldText, dimText, supportsAnsiColor } from './terminal.js';
+import { HELP_TOPICS } from './help-topics.js';
 
 export function printHelp(message?: string): void {
   if (message) {
@@ -16,6 +17,7 @@ export function printHelp(message?: string): void {
     'Usage: tmd <command> [options]',
     '',
     formatSection('Commands', [
+      ['help', 'Show this help'],
       ['lint', 'Validate markdown files for format issues'],
       ['index', 'Parse files and generate todos.json'],
       ['enrich', 'Convert shorthands and auto-generate IDs'],
@@ -42,7 +44,34 @@ export function printHelp(message?: string): void {
       ['--version', 'Show version'],
     ]),
     '',
+    formatSection('Help topics', [
+      ['help topics', 'List help topics'],
+      ['help <topic>', `Deep help: ${Object.keys(HELP_TOPICS).join(', ')}`],
+    ]),
+    '',
+    formatSection('Concepts', [
+      ['Tasks', 'Markdown checkbox lines: - [ ] / - [x]'],
+      ['Trackable task', 'Has [id:<local-id>] and is under a heading with [project:<id>]'],
+      ['Global ID', '<project-id>:<local-id> (example: as-onb:1.1)'],
+      ['Metadata', 'Trailing [key:value ...] (keys include energy/priority/est/due/plan/bucket/area/tags)'],
+      ['Shorthands', 'tmd enrich expands (A)/(B)/(C), * ! > ~ ?, and @today/@upcoming/... into metadata'],
+    ]),
+    '',
+    formatSection('Config', [
+      ['Project config', 'Nearest .todosmd.json (walks up from cwd)'],
+      ['Global config', '~/.config/todosmd/config.json'],
+      ['Key fields', 'files (inputs), output (index path), views (sync targets)'],
+    ]),
+    '',
+    formatSection('Common workflows', [
+      ['Initialize index', 'tmd enrich && tmd index'],
+      ['Query tasks', 'tmd list ... | tmd search ... | tmd show <id>'],
+      ['Edit tasks', 'tmd done/undone/add/edit (auto reindex + auto sync unless --no-...)'],
+      ['Regenerate views', 'tmd sync (requires views configured)'],
+    ]),
+    '',
     dimText('Run `tmd <command> --help` for command-specific help.'),
+    dimText('Run `tmd help <topic>` for deeper help on non-command topics.'),
   ];
 
   console.error(lines.join('\n'));

@@ -47,14 +47,15 @@ Options:
   --parent <id>     Add as subtask under this local ID
   --energy <level>  Set energy level (low, normal, high)
   --est <duration>  Set estimate (15m, 30m, 1h, etc.)
-  --due <date>      Set due date (YYYY-MM-DD)
-  --plan <date>     Set planned work date (YYYY-MM-DD, today, tomorrow)
-  --bucket <name>   Set planning bucket (today, upcoming, anytime, someday, or custom)
+  --due <date>      Set due date (YYYY-MM-DD, today, tomorrow, +Nd, +Nw)
+  --plan <date>     Set planned work date (YYYY-MM-DD, today, tomorrow, +Nd, +Nw)
+  --bucket <name>   Set planning bucket (today, upcoming, anytime, someday, now, or custom)
   --area <name>     Override area
   --tags <tags>     Add tags (comma-separated)
   --json            Output as JSON
   --no-reindex      Don't update todos.json after add
   --no-sync         Don't run tmd sync after add
+  --file, -f <path> Input file(s) used when reindexing (repeatable)
   -c, --config      Path to config file
   -o, --output      Override output file path
   -h, --help        Show this help

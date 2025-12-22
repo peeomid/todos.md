@@ -12,10 +12,13 @@ pnpm build
 ### Install system-wide (so `tmd` works anywhere)
 
 ```bash
-# Option A (works out of the box for most Node setups)
+# Recommended (build + link globally)
+./script/build-and-link-global.sh
+
+# Manual option A (works out of the box for most Node setups)
 npm link
 
-# Option B (pnpm global link) — requires pnpm global bin dir in PATH
+# Manual option B (pnpm global link) — requires pnpm global bin dir in PATH
 pnpm setup
 pnpm link --global
 ```

@@ -363,9 +363,9 @@ Options:
   --energy <level>      Set energy (low, normal, high)
   --priority <level>    Set priority (high, normal, low, or none to remove)
   --est <duration>      Set estimate (15m, 30m, 1h, etc., or none)
-  --due <date>          Set due date (YYYY-MM-DD, today, tomorrow, or none)
-  --plan <date>         Set plan date (YYYY-MM-DD, today, tomorrow, or none)
-  --bucket <name>       Set bucket (today, upcoming, anytime, someday, or none)
+  --due <date>          Set due date (YYYY-MM-DD, today, tomorrow, +Nd, +Nw, or none)
+  --plan <date>         Set plan date (YYYY-MM-DD, today, tomorrow, +Nd, +Nw, or none)
+  --bucket <name>       Set bucket (today, upcoming, anytime, someday, now, custom, or none)
   --area <name>         Set area (or none to remove)
   --tags <tags>         Set tags (comma-separated, or none to remove)
   --add-tag <tag>       Add a single tag
@@ -373,6 +373,9 @@ Options:
   --json                Output as JSON
   --no-reindex          Don't update todos.json after edit
   --no-sync             Don't run tmd sync after edit
+  --file, -f <path>     Input file(s) used when reindexing (repeatable)
+  -c, --config          Path to config file
+  -o, --output          Override output file path
 
 Examples:
   tmd edit as-onb:1.1 --due 2025-12-20

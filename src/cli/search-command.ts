@@ -159,6 +159,8 @@ export function printSearchHelp(): void {
     '  area:<name>           Filter by area',
     '  status:<status>       Filter by status (open, done, all)',
     '  bucket:<name>         Filter by bucket',
+    '  due:<date>            Filter by due date spec (today, tomorrow, this-week, next-week, YYYY-MM-DD, YYYY-MM-DD:YYYY-MM-DD)',
+    '  plan:<date>           Filter by plan date spec (same formats as due:)',
     '  ... (see tmd list --help for all filters)',
     '',
     'Options:',

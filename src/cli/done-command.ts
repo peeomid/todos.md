@@ -36,6 +36,11 @@ export function printDoneHelp(): void {
 
 Mark a task as completed.
 
+Notes:
+  - Cascades: all descendant subtasks are also marked done.
+  - After editing, this command reindexes by default (writes todos.json) and
+    runs a push-only sync if views are configured (use --no-reindex / --no-sync to skip).
+
 Arguments:
   <global-id>       Task global ID (e.g., as-onb:1.1)
 
@@ -43,6 +48,7 @@ Options:
   --json            Output as JSON
   --no-reindex      Don't update todos.json after edit
   --no-sync         Don't run tmd sync after edit
+  --file, -f <path> Input file(s) used when reindexing (repeatable)
   -c, --config      Path to config file
   -o, --output      Override output file path
   -h, --help        Show this help
