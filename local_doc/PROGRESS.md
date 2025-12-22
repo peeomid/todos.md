@@ -58,3 +58,4 @@
 - TUI: help overlay readability upgrades — colored section headers and vim/arrow scrolling (2025-12-22)
 - TUI: folding shortcuts — `f` folds selected row, `F` folds/unfolds all; `o` toggles priority ordering (high-first/low-first/off) with header flags indicator (2025-12-22)
 - TUI: fixed priority ordering toggle in non-drilldown views (2025-12-22)
+- TUI: Projects list filtering moved behind `/` to avoid accidental `0–9` view switching (2025-12-22)

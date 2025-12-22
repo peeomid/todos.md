@@ -206,6 +206,7 @@ Default sort within bucket views:
 - Added `o` to toggle priority ordering: high-first → low-first → off.
 - Added `f` to fold/unfold the selected row, and `F` to fold/unfold everything (reliable across terminals).
 - Header “Flags” line now surfaces the current priority ordering mode alongside hide/show done.
+- Projects view: changed default “type to filter” to an explicit `/`-activated filter mode to avoid collisions with `0–9` view switching.
 
 ### Files Updated
 - `tui_specs.md` — keybindings + header/help examples updated

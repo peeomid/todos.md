@@ -43,7 +43,7 @@
 - 2025-12-20: Added `bucket:now` (working on right now): new built-in `Now` view (`1`) + `n` toggles now on/off for the selected task.
 - 2025-12-22: Rekeyed built-in views (`0` All, `1` Now, `2` Today, …, `6` Projects), moved plan hotkey to `t`, and added `*`/`@now` shorthands for `bucket:now`.
 - 2025-12-22: Task list improvements: row-number column, `:` go-to-line, selectable + foldable headers (`f` toggles), clearer subtask indentation, and `bucket:now` background highlight.
-- 2025-12-22: Projects list improvements: type-to-filter by default with arrow-only navigation (vim keys disabled in that list).
+- 2025-12-22: Projects list improvements: `/` activates type-to-filter, with arrow-only navigation (vim keys disabled in that list).
 - 2025-12-22: Added area-heading grouping in task lists (e.g. `# Work [area:work]` appears above its projects when there are matching tasks in the current view).
 - 2025-12-22: Added fold/unfold-all (`F`) and `o` priority-order toggle; current priority order is shown in the header flags (next to hide/show done).
 - 2025-12-22: Fixed priority ordering toggle applying in all views (not just single-project drilldown).

@@ -187,8 +187,9 @@ Built-ins (v1):
  * `key: "6"`
  * `name: "Projects"`
  * Shows a list of projects, not tasks.
- * The projects list supports “type to filter” by default (live substring match on `id`, `name`, and `area`).
- * In the projects list, list movement uses arrow keys (↑/↓) rather than vim keys.
+ * Press `/` to activate filtering, then type to filter (live substring match on `id`, `name`, and `area`).
+ * While filtering is active: `Enter` accepts; `Esc` cancels and restores the previous filter.
+ * In the projects list, list movement supports arrow keys (↑/↓) and vim keys (`j/k`) when not filtering.
  * Selecting a project opens a project-specific task list (like `status:open project:<id>`).
  * `Ctrl+N` adds a new project and immediately switches into that project’s drilldown view.
  * Add-project flow guidance (v1):

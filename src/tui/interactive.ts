@@ -86,7 +86,7 @@ interface SessionState {
   };
   selection: { row: number; scroll: number; selectedId: string | null };
   projects: { drilldownProjectId: string | null };
-  projectsList: { input: TextInputState };
+  projectsList: { active: boolean; input: TextInputState; staged: TextInputState };
   collapsedProjects: Set<string>;
   collapsedTasks: Set<string>;
   collapsedAreas: Set<string>;
@@ -300,12 +300,14 @@ function getFooterHelpLines(
   width: number
 ): { line1: string; line2: string } {
   if (isProjectsList) {
-    const globalFull = ['[↑/↓] move', '[0–9] views', '[/] search', '[?] help', '[q] quit'];
-    const globalCompact = ['[/] search', '[q] quit'];
+    const globalFull = ['[↑/↓] move', '[0–9] views', '[/] filter', '[?] help', '[q] quit'];
+    const globalCompact = ['[/] filter', '[q] quit'];
     const line1 = width < 60 ? joinHelpChunks(globalCompact, width) : joinHelpChunks(globalFull, width);
 
-    const full = ['type = filter', '[Enter] open project', '[Ctrl+N] add project'];
-    const compact = ['type = filter', '[Enter] open', '[Ctrl+N] add'];
+    const full = state.projectsList.active
+      ? ['type = filter', '[Enter] done', '[Esc] cancel']
+      : ['[/] filter', '[Enter] open project', '[Ctrl+N] add project'];
+    const compact = state.projectsList.active ? ['type = filter', '[Enter] done'] : ['[/] filter', '[Enter] open', '[Ctrl+N] add'];
     return { line1, line2: joinHelpChunks(width < 60 ? compact : full, width) };
   }
 
@@ -879,17 +881,22 @@ function render(state: SessionState, term: Term): void {
     setCursorVisible(term, true);
   } else if (isProjectsList) {
     term.eraseLineAfter();
-    const { cursorCol } = renderLabeledInputField(term, {
-      label: 'Projects ',
-      value: state.projectsList.input.value,
-      cursorIndex: state.projectsList.input.cursor,
-      width,
-      colorsDisabled: state.colorsDisabled,
-      placeholder: 'type to filter…',
-    });
-    term.eraseLineAfter();
-    term.moveTo(cursorCol, footerTop + 7);
-    setCursorVisible(term, true);
+    if (state.projectsList.active) {
+      const { cursorCol } = renderLabeledInputField(term, {
+        label: 'Projects ',
+        value: state.projectsList.input.value,
+        cursorIndex: state.projectsList.input.cursor,
+        width,
+        colorsDisabled: state.colorsDisabled,
+        placeholder: 'type to filter…',
+      });
+      term.eraseLineAfter();
+      term.moveTo(cursorCol, footerTop + 7);
+      setCursorVisible(term, true);
+    } else {
+      style.dim(truncateByWidth('Projects: press / to filter', width));
+      term.hideCursor();
+    }
   } else {
     style.dim(truncateByWidth(state.busy ? 'Working…' : '', width));
   }
@@ -907,7 +914,7 @@ function render(state: SessionState, term: Term): void {
     });
   }
 
-  if (!state.search.active && !state.command.active && !isProjectsList) {
+  if (!state.search.active && !state.command.active && !(isProjectsList && state.projectsList.active)) {
     term.hideCursor();
   }
 }
@@ -1356,7 +1363,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     },
     selection: { row: 0, scroll: 0, selectedId: null },
     projects: { drilldownProjectId: null },
-    projectsList: { input: createTextInput('') },
+    projectsList: { active: false, input: createTextInput(''), staged: createTextInput('') },
     collapsedProjects: new Set<string>(),
     collapsedTasks: new Set<string>(),
     collapsedAreas: new Set<string>(),
@@ -1396,7 +1403,9 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       state.command.kind = null;
       state.command.input = createTextInput('');
       if (state.views[idx]?.kind === 'projects') {
+        state.projectsList.active = false;
         state.projectsList.input = createTextInput('');
+        state.projectsList.staged = createTextInput('');
       }
       state.query = getEffectiveQuery(state);
       state.selection = { row: 0, scroll: 0, selectedId: null };
@@ -1414,7 +1423,9 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     state.command.kind = null;
     state.command.input = createTextInput('');
     if (state.views[next]?.kind === 'projects') {
+      state.projectsList.active = false;
       state.projectsList.input = createTextInput('');
+      state.projectsList.staged = createTextInput('');
     }
     state.query = getEffectiveQuery(state);
     state.selection = { row: 0, scroll: 0, selectedId: null };
@@ -1994,6 +2005,17 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         state.command.input = createTextInput('');
         recompute(state);
       }
+      {
+        const view = state.views[state.viewIndex]!;
+        const isProjectsList = view.kind === 'projects' && !state.projects.drilldownProjectId;
+        if (isProjectsList && state.projectsList.active) {
+          state.projectsList.active = false;
+          state.projectsList.input = state.projectsList.staged;
+          state.projectsList.staged = createTextInput('');
+          state.selection = { row: 0, scroll: 0, selectedId: null };
+          recompute(state);
+        }
+      }
 
       state.message = 'Press Ctrl+C again to quit';
       render(state, term);
@@ -2174,12 +2196,55 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
+    // Projects list filter mode (activated via "/")
+    if (isProjectsList && state.projectsList.active) {
+      if (name === 'ENTER') {
+        state.projectsList.active = false;
+        state.projectsList.staged = createTextInput('');
+        recompute(state);
+        render(state, term);
+        return;
+      }
+      if (name === 'ESCAPE') {
+        state.projectsList.active = false;
+        state.projectsList.input = state.projectsList.staged;
+        state.projectsList.staged = createTextInput('');
+        state.selection = { row: 0, scroll: 0, selectedId: null };
+        recompute(state);
+        render(state, term);
+        return;
+      }
+      const applied = applyTextInputKey(state.projectsList.input, name);
+      if (applied && applied.didChangeValue) {
+        state.projectsList.input = applied.state;
+        recompute(state);
+        render(state, term);
+        return;
+      }
+      if (applied) {
+        state.projectsList.input = applied.state;
+        render(state, term);
+        return;
+      }
+      return;
+    }
+
     // Enter search
-    if (name === '/') {
+    if (!isProjectsList && name === '/') {
       state.search.active = true;
       state.search.scope = 'view';
       state.search.input = createTextInput(ensureTrailingSpace(state.query));
       updateAutocomplete(state);
+      render(state, term);
+      return;
+    }
+
+    // Projects list: activate filter input
+    if (isProjectsList && name === '/') {
+      state.projectsList.active = true;
+      state.projectsList.staged = state.projectsList.input;
+      state.projectsList.input = createTextInput(state.projectsList.input.value);
+      recompute(state);
       render(state, term);
       return;
     }
@@ -2248,34 +2313,12 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         state.projects.drilldownProjectId = p.id;
         state.query = getEffectiveQuery(state);
         state.selection = { row: 0, scroll: 0, selectedId: null };
+        state.projectsList.active = false;
+        state.projectsList.staged = createTextInput('');
         recompute(state);
         render(state, term);
       }
       return;
-    }
-
-    // Projects list: live filter (typing edits the filter)
-    if (isProjectsList) {
-      if (name === 'ESCAPE' && state.projectsList.input.value.trim() !== '') {
-        state.projectsList.input = createTextInput('');
-        state.selection = { row: 0, scroll: 0, selectedId: null };
-        recompute(state);
-        render(state, term);
-        return;
-      }
-      const applied = applyTextInputKey(state.projectsList.input, name);
-      if (applied && applied.didChangeValue) {
-        state.projectsList.input = applied.state;
-        recompute(state);
-        render(state, term);
-        return;
-      }
-      // If it was just cursor movement, still rerender for cursor visibility.
-      if (applied) {
-        state.projectsList.input = applied.state;
-        render(state, term);
-        return;
-      }
     }
 
     // Projects list: add project (Ctrl+N)
@@ -2395,7 +2438,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
 
     // Movement
-    if (name === 'DOWN' || (!isProjectsList && name === 'j')) {
+    if (name === 'DOWN' || name === 'j') {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row + 1, 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
@@ -2408,7 +2451,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       render(state, term);
       return;
     }
-    if (name === 'UP' || (!isProjectsList && name === 'k')) {
+    if (name === 'UP' || name === 'k') {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row - 1, 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
@@ -2421,7 +2464,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       render(state, term);
       return;
     }
-    if ((!isProjectsList && name === 'g')) {
+    if (name === 'g') {
       if (isProjectsList) {
         state.selection.row = 0;
         updateScrollForSelection(listSize, listHeight);
@@ -2433,7 +2476,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       render(state, term);
       return;
     }
-    if ((!isProjectsList && name === 'G')) {
+    if (name === 'G') {
       if (isProjectsList) {
         state.selection.row = Math.max(0, listSize - 1);
         updateScrollForSelection(listSize, listHeight);
@@ -2445,7 +2488,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       render(state, term);
       return;
     }
-    if ((!isProjectsList && (name === 'CTRL_U' || name === 'PAGE_UP'))) {
+    if (name === 'CTRL_U' || name === 'PAGE_UP') {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row - Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);
@@ -2458,7 +2501,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       render(state, term);
       return;
     }
-    if ((!isProjectsList && (name === 'CTRL_D' || name === 'PAGE_DOWN'))) {
+    if (name === 'CTRL_D' || name === 'PAGE_DOWN') {
       if (isProjectsList) {
         state.selection.row = clamp(state.selection.row + Math.floor(listHeight / 2), 0, Math.max(0, listSize - 1));
         updateScrollForSelection(listSize, listHeight);

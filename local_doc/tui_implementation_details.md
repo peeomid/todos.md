@@ -130,7 +130,7 @@ Global:
 - `h/l` or `←/→` previous/next view
 - `z` show/hide done (query rewrite)
 - `o` toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line
-- `/` enter live search (prefilled with current query + a trailing space)
+- `/` enter live search (prefilled with current query + a trailing space); in the Projects list, `/` opens project filtering instead
 - `?` shorthand help (priority/bucket)
 - in search: type filters or plain words (plain words are treated as `text:` filters)
 - in search: `Enter` applies and returns to list; `Esc`/`Ctrl+C` cancels; `!`/`Ctrl+/` toggles scope; `z` toggles status mode
@@ -168,7 +168,7 @@ Task actions:
 
 Projects view:
 - `Enter` drills down into a project (shows that project’s tasks)
-- Projects list supports “type to filter” by default (live substring match on id/name/area); list navigation uses arrow keys (↑/↓), not vim keys.
+- Projects list supports “type to filter” via `/` (live substring match on id/name/area); list navigation supports arrow keys (↑/↓) and vim keys (`j/k`) when not filtering.
 - `Ctrl+N` adds a new project (writes a new project heading and switches into that project’s drilldown view)
 - `Esc`/`Backspace` exits drilldown
 
