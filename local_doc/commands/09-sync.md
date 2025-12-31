@@ -115,6 +115,7 @@ The `query` attribute uses the same key:value syntax as `tmd list` filters:
 <!-- tmd:start query="project:inbox status:open" -->
 <!-- tmd:start query="due:this-week area:work" -->
 <!-- tmd:start query="overdue:true" -->
+<!-- tmd:start query="(bucket:today | plan:today) priority:high" -->
 ```
 
 Both double and single quotes are accepted:

@@ -2,7 +2,7 @@ import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
 import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
 import { insertTask, type TaskMetadata } from '../editor/task-inserter.js';
-import { loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import { greenText } from './terminal.js';
@@ -73,7 +73,13 @@ Examples:
 }
 
 function parseAddFlags(args: string[]): AddOptions {
-  const boolFlags = extractBooleanFlags(args, ['--json', '--no-reindex', '--no-sync']);
+  const boolFlags = extractBooleanFlags(args, [
+    '--json',
+    '--no-reindex',
+    '--no-sync',
+    '--global-config',
+    '-G',
+  ]);
   const valueFlags = extractFlags(args, [
     '--config',
     '-c',
@@ -90,7 +96,10 @@ function parseAddFlags(args: string[]): AddOptions {
   ]);
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'] ?? null;
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);

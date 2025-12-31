@@ -15,7 +15,7 @@
 - CLI params: `--file/--input/-f` and `--output/--out/-o` to choose input/output paths
 - Startup/exit lifecycle: start runs `enrich → index → load`, exit runs `index → (optional) sync` once
 - Views: built-ins `0–6` (0=All, 1=Now, 2=Today) + custom views via `interactive.views[]` in config
-- Navigation + toggles: `0–9` jump to view, `h/l` or `←/→` collapse/expand (tree navigation), `z` show/hide done (query rewrite), `o` priority ordering (high-first / low-first / off), `/` live search with scope toggle and inline autocomplete
+- Navigation + toggles: `0–9` jump to view, `h/l` or `←/→` collapse/expand (tree navigation), `z` show/hide done (query rewrite), `o` priority ordering (high-first / low-first / off), `T/U/Y/S` focus a bucket within the current view (query rewrite), `/` live search with scope toggle and inline autocomplete
 - Task list UX: row numbers column, `:` go-to-line, selectable + foldable area/project headers and tasks (with ▾/▸ indicator)
 - Task list UX: `F` folds/unfolds everything
 - Structure: subtasks render indented with a visible prefix marker
@@ -28,7 +28,7 @@
 - Rendering: tasks in `bucket:now` use a distinct background color
 - Row shorthands: task rows show visual shorthands (priority `(A)/(B)/(C)` and bucket `*/!/>/~/?`) so users can learn them. These are **display-only** and derived from `priority:`/`bucket:` metadata; the TUI does not auto-insert shorthand tokens into the Markdown task text.
 - Header emphasis: the active query is highlighted in the header line
-- Safety: external edit detection via file `mtime` prompts before writing
+- Safety: watches input files for external edits and auto-reloads; also forces reload before any write if the file changed
 - Small screens: footer help auto-condenses (shows the most important keys and an ellipsis), and `?` opens a scrollable help overlay with keybindings + shorthands
 
 ## Changelog
@@ -50,3 +50,10 @@
 - 2025-12-22: Added project section headings in task lists: organizational headings without metadata (e.g. `### Website`) render as collapsible separators under their project.
 - 2025-12-22: Added fold/unfold-all (`F`) and `o` priority-order toggle; current priority order is shown in the header flags (next to hide/show done).
 - 2025-12-22: Fixed priority ordering toggle applying in all views (not just single-project drilldown).
+- 2025-12-23: Auto-reload: TUI watches input files for changes, forces reload before writes, and shows an `Auto-reloaded (…)` indicator in the header when it refreshes.
+- 2025-12-23: Add/edit modals show Project/Header context; add modal starts focused on Text, supports Header picker, and defaults to inserting a sibling task next to the cursor.
+- 2025-12-26: Auto-reload now auto-runs `enrich` on externally changed files when needed so newly added manual tasks appear immediately (config: `interactive.autoEnrichOnReload`).
+- 2025-12-27: Today view query now includes `bucket:today | plan:today | due:today` by default.
+- 2025-12-26: Keybindings: plan moved to `P`; quick bucket set added (`t/!` today, `u/>` upcoming, `y/~` anytime, `s` someday).
+- 2025-12-26: Keybindings: `T/U/Y/S` toggles focusing `today/upcoming/anytime/someday` buckets within the current view (query rewrite: set/clear `bucket:<bucket>`).
+- 2025-12-26: Fixed task sorting in tree view: sorting no longer pulls subtasks out from under their parent (subtasks stay nested while the subtree sorts as a unit).

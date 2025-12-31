@@ -29,6 +29,12 @@ interface ListFilters {
   text?: string;
 }
 
+interface ListFilterPayload {
+  filters: ListFilters;
+  filterGroups?: string[][];
+  query?: string;
+}
+
 /**
  * Format metadata for compact display
  */
@@ -213,7 +219,7 @@ export function formatFull(tasks: Task[], index: TaskIndex): string {
 /**
  * Format tasks as JSON
  */
-export function formatJson(tasks: Task[], filters: ListFilters): string {
+export function formatJson(tasks: Task[], payload: ListFilterPayload): string {
   const summary = computeSummary(tasks);
 
   const output = {
@@ -236,8 +242,10 @@ export function formatJson(tasks: Task[], filters: ListFilters): string {
     })),
     summary,
     filters: Object.fromEntries(
-      Object.entries(filters).filter(([, v]) => v !== undefined)
+      Object.entries(payload.filters).filter(([, v]) => v !== undefined)
     ),
+    filterGroups: payload.filterGroups,
+    query: payload.query,
   };
 
   return JSON.stringify(output, null, 2);

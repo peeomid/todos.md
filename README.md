@@ -26,6 +26,9 @@ pnpm link --global
 ## Usage
 
 ```bash
+# Initialize a new workspace (creates todos.md, views/daily.md, and .todosmd.json)
+tmd init
+
 # Validate markdown format
 tmd lint
 
@@ -58,6 +61,35 @@ Create `.todosmd.json` in your project root:
   "output": "todos.json"
 }
 ```
+
+### Config discovery (precedence)
+
+`tmd` loads config from the first match:
+
+1. `--config <path>` / `-c <path>`
+2. nearest `.todosmd.json` walking up from cwd
+3. global config: `~/.config/todosmd/config.json`
+
+See: `tmd help config`
+
+### Custom views (interactive TUI)
+
+`tmd interactive` supports custom views via `interactive.views` in `.todosmd.json`:
+
+```json
+{
+  "interactive": {
+    "views": [
+      { "key": "7", "name": "Today (Work)", "query": "status:open area:work bucket:today", "sort": "priority,plan,due" },
+      { "key": "8", "name": "High Impact", "query": "status:open priority:high", "sort": "bucket,plan,due" }
+    ]
+  }
+}
+```
+
+OR tip: for some filters you can pass multiple values (e.g. `project:sy,in` or `project:sy project:in`).
+
+Note: top-level `views` is for `tmd sync` view files; `interactive.views` is for `tmd interactive`.
 
 ## Format Specification
 

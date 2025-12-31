@@ -13,6 +13,7 @@ import {
   filterByParent,
   filterTopLevel,
   composeFilters,
+  applyDefaultStatusToGroups,
   sortTasks,
   groupTasks,
   buildFiltersFromOptions,
@@ -66,6 +67,11 @@ describe('parseFilterArgs', () => {
       status: 'open',
       energy: 'low',
     });
+  });
+
+  it('merges repeated project filters as OR', () => {
+    const result = parseFilterArgs(['project:sy', 'project:in', 'status:open']);
+    expect(result.project).toBe('sy,in');
   });
 
   it('parses priority filter', () => {
@@ -235,6 +241,23 @@ describe('composeFilters', () => {
   });
 });
 
+describe('applyDefaultStatusToGroups', () => {
+  it('adds status:open when missing', () => {
+    const groups = applyDefaultStatusToGroups([['project:inbox']], 'open');
+    expect(groups).toEqual([['project:inbox', 'status:open']]);
+  });
+
+  it('preserves existing status filter', () => {
+    const groups = applyDefaultStatusToGroups([['status:done', 'project:inbox']], 'open');
+    expect(groups).toEqual([['status:done', 'project:inbox']]);
+  });
+
+  it('defaults empty group set to status:open', () => {
+    const groups = applyDefaultStatusToGroups([], 'open');
+    expect(groups).toEqual([['status:open']]);
+  });
+});
+
 describe('sortTasks', () => {
   it('sorts by priority (high first)', () => {
     const tasks = [
@@ -336,6 +359,15 @@ describe('buildFiltersFromOptions', () => {
 
     expect(composed(createTask({ projectId: 'inbox', completed: false, energy: 'low' }))).toBe(true);
     expect(composed(createTask({ projectId: 'inbox', completed: true, energy: 'low' }))).toBe(false);
+  });
+
+  it('supports OR for repeated/comma-separated project filters', () => {
+    const filters = buildFiltersFromOptions({ project: 'sy,in' });
+    const composed = composeFilters(filters);
+
+    expect(composed(createTask({ projectId: 'sy' }))).toBe(true);
+    expect(composed(createTask({ projectId: 'in' }))).toBe(true);
+    expect(composed(createTask({ projectId: 'other' }))).toBe(false);
   });
 
   it('handles empty options', () => {

@@ -25,6 +25,7 @@ export const ConfigSchema = z.object({
         })
         .optional(),
       defaultProject: z.string().optional(),
+      autoEnrichOnReload: z.boolean().optional(),
     })
     .optional(),
   defaults: z

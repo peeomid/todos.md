@@ -44,7 +44,7 @@ Added keys:
 Built-in views:
 - `0` All: `status:open`
 - `1` Now: `status:open bucket:now`
-- `2` Today: `status:open bucket:today`
+- `2` Today: `status:open (bucket:today | plan:today | due:today)`
 - `3` Upcoming: `status:open bucket:upcoming`
 - `4` Anytime: `status:open bucket:anytime`
 - `5` Someday: `status:open bucket:someday`
@@ -130,10 +130,11 @@ Global:
 - `0–9` jump to view
 - `z` show/hide done (query rewrite)
 - `o` toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line
+- `T`/`U`/`Y`/`S` toggle focusing `bucket:today`/`bucket:upcoming`/`bucket:anytime`/`bucket:someday` in the current view (query rewrite: set `bucket:<bucket>`; press again clears `bucket:`)
 - `/` enter live search (prefilled with current query + a trailing space); in the Projects list, `/` opens project filtering instead
 - `?` shorthand help (priority/bucket)
 - in search: type filters or plain words (plain words are treated as `text:` filters)
-- in search: `Enter` applies and returns to list; `Esc`/`Ctrl+C` cancels; `!`/`Ctrl+/` toggles scope; `z` toggles status mode
+- in search: `Enter` applies and returns to list; `Esc`/`Ctrl+C` cancels; `Ctrl+/` toggles scope
 - in search (autocomplete): `Tab` accepts suggestion; `↑/↓` navigate suggestions; typing filters suggestions in real-time
 
 Movement:
@@ -153,8 +154,13 @@ Task actions:
 - `p` priority menu (h/n/l/c) — shorthands: `h` high, `n` normal, `l` low
 - `b` bucket menu (n/t/u/a/s/c) — shorthands: `n` now, `t` today, `u` upcoming, `a` anytime, `s` someday
   - plus rule: if bucket becomes `today` and `plan` is empty, set `plan` to today
-- `n` toggle `bucket:now` on/off for the selected task
-- `t` plan menu (today/manual/clear)
+- Quick bucket toggle (when a task row is selected):
+  - `t` or `!` toggles `bucket:today` (and if toggling on with empty plan, set plan to today)
+  - `u` or `>` toggles `bucket:upcoming`
+  - `y` or `~` toggles `bucket:anytime`
+  - `s` toggles `bucket:someday`
+- `n` toggle between `bucket:now` and `bucket:today` for the selected task (and if switching to today with no plan, set plan to today)
+- `P` plan menu (today/manual/clear)
 - `d` due menu (today/manual/clear)
 - `e` edit modal (Text + Meta):
   - Multi-field, command-line-style UX
@@ -162,9 +168,9 @@ Task actions:
   - `Shift+Tab`: previous field (best-effort; terminal support varies)
   - `Enter`: apply suggestion if list is open; otherwise next field / save on final field
   - `↑/↓`: navigate suggestions if list is open; otherwise move between fields
-- `a` add task modal (Project + Text + Meta):
+- `a` add task modal (Project + Header + Text + Meta):
   - Same key semantics as `e`
-  - Default destination still inferred by context (project drilldown → single-project list → selected task’s project → `interactive.defaultProject`), but the modal always starts focused on Project so the destination is explicit/editable
+  - Default destination still inferred by context (project drilldown → single-project list → selected task’s project → `interactive.defaultProject`), but the modal starts focused on Text (Project/Header shown above it)
   - Metadata uses shared autocomplete UI (same renderer as `/` search)
 
 Projects view:
@@ -177,8 +183,8 @@ Projects view:
 
 External edit protection:
 - `fileMtimes` are captured at session start and refreshed after rebuilds.
-- Before any write, the UI checks current `mtime` and prompts `y/n` to reload if it changed.
-- If reload is chosen, the in-memory index is rebuilt from disk before retrying the operation.
+- The UI watches input files for changes and auto-reloads the in-memory index when they change.
+- Before any write, the UI checks current `mtime` and forces an automatic reload if it changed (no prompt), then retries the operation against refreshed state.
 
 Task line localization:
 - Writes locate the task by `metadata.id` within the current project context.
@@ -209,7 +215,7 @@ Tests:
 ## Known Limitations (v1)
 
 - No `$EDITOR` integration for `e` (inline editor only).
-- No `r` refresh command; the UI rebuilds index only when prompted due to `mtime` changes (and on exit).
+- No `r` refresh command; changes are picked up via auto-reload on file changes (and on exit).
 - Rendering is full redraw (simple but not the most flicker-free).
 - TUI behavior is mostly manual-tested; automated tests cover shared primitives (date parsing, filters, etc.), not interactive key flows.
 

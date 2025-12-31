@@ -6,6 +6,7 @@ import type { EnrichOptions, EnrichChange, EnrichFileResult, EnrichResult } from
 
 const TASK_REGEX = /^(\s*)- \[([ xX])\]\s+(.+)$/;
 const PROJECT_HEADING_REGEX = /^(#{1,6})\s+.+\[.*project:([^\s\]]+)/;
+const ANY_HEADING_REGEX = /^#{1,6}\s+/;
 
 interface ProjectContext {
   id: string;
@@ -60,6 +61,8 @@ export function enrichContent(content: string, filePath: string, options: Enrich
   // Second pass: enrich tasks
   currentProject = null;
   const modifiedLines: string[] = [];
+  let taskStack: Array<{ indentWidth: number; localId: string }> = [];
+  let baseIndentWidth: number | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
@@ -69,6 +72,16 @@ export function enrichContent(content: string, filePath: string, options: Enrich
     const projectMatch = line.match(PROJECT_HEADING_REGEX);
     if (projectMatch?.[2]) {
       currentProject = projectsById.get(projectMatch[2]) ?? null;
+      taskStack = [];
+      baseIndentWidth = null;
+      modifiedLines.push(line);
+      continue;
+    }
+
+    // Reset task stack on headings (lists typically restart under new headings)
+    if (ANY_HEADING_REGEX.test(line)) {
+      taskStack = [];
+      baseIndentWidth = null;
       modifiedLines.push(line);
       continue;
     }
@@ -89,6 +102,21 @@ export function enrichContent(content: string, filePath: string, options: Enrich
 
     const { metadata, textWithoutMetadata, hasMetadata } = parseMetadataBlock(taskContent);
     const added: string[] = [];
+    const currentIndentWidth = measureIndentWidth(indent);
+
+    if (baseIndentWidth === null) baseIndentWidth = currentIndentWidth;
+    // If indentation decreases below the baseline, treat it as a new list block.
+    if (currentIndentWidth < baseIndentWidth) {
+      baseIndentWidth = currentIndentWidth;
+      taskStack = [];
+    }
+
+    // Determine parent based on indentation.
+    while (taskStack.length > 0 && taskStack[taskStack.length - 1]!.indentWidth >= currentIndentWidth) {
+      taskStack.pop();
+    }
+    const isTopLevel = currentIndentWidth === baseIndentWidth;
+    const parentLocalId = !isTopLevel ? taskStack[taskStack.length - 1]?.localId : undefined;
 
     // Parse shorthands from task text
     const shorthandResult = parseShorthands(textWithoutMetadata, options.keepShorthands, today);
@@ -112,7 +140,7 @@ export function enrichContent(content: string, filePath: string, options: Enrich
 
     // Auto-generate ID if missing
     if (!metadata.id) {
-      const newId = generateNextId(currentProject.existingIds);
+      const newId = generateNextId(currentProject.existingIds, parentLocalId);
       metadata.id = newId;
       currentProject.existingIds.push(newId);
       added.push(`id:${newId}`);
@@ -151,6 +179,11 @@ export function enrichContent(content: string, filePath: string, options: Enrich
     } else {
       modifiedLines.push(line);
     }
+
+    // Update stack for subsequent children.
+    if (metadata.id) {
+      taskStack.push({ indentWidth: currentIndentWidth, localId: metadata.id });
+    }
   }
 
   const modifiedContent = modifiedLines.join('\n');
@@ -162,6 +195,11 @@ export function enrichContent(content: string, filePath: string, options: Enrich
     modifiedContent,
     modified,
   };
+}
+
+function measureIndentWidth(indent: string): number {
+  // Treat tabs as 2 spaces for consistent indentation comparisons.
+  return indent.replaceAll('\t', '  ').length;
 }
 
 /**

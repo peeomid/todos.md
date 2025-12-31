@@ -1,0 +1,32 @@
+{
+  "files": ["todos.md", "projects/work.md"],
+  "output": "todos.json",
+  "views": ["views/daily.md", "views/weekly.md"],
+  "interactive": {
+    "views": [
+      {
+        "key": "7",
+        "name": "Today (Work)",
+        "query": "status:open area:work bucket:today",
+        "sort": "priority,plan,due"
+      },
+      {
+        "key": "8",
+        "name": "High Impact",
+        "query": "status:open priority:high",
+        "sort": "bucket,plan,due"
+      }
+    ],
+    "groupBy": "project",
+    "colors": {
+      "disable": false
+    },
+    "defaultProject": "inbox",
+    "autoEnrichOnReload": true
+  },
+  "defaults": {
+    "area": "work",
+    "energy": "normal"
+  }
+}
+

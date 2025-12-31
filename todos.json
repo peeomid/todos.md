@@ -1,9 +1,10 @@
 {
-  "version": 1,
-  "generatedAt": "2025-12-09T04:56:17.361Z",
+  "version": 3,
+  "generatedAt": "2025-12-23T02:59:20.882Z",
   "files": [
     "todos.md"
   ],
+  "areas": {},
   "projects": {
     "inbox": {
       "id": "inbox",
@@ -17,14 +18,34 @@
       "name": "Work Project",
       "area": "work",
       "filePath": "todos.md",
-      "lineNumber": 11
+      "lineNumber": 10
     },
     "side": {
       "id": "side",
       "name": "Side Project",
       "area": "sidebiz",
       "filePath": "todos.md",
-      "lineNumber": 20
+      "lineNumber": 18
+    }
+  },
+  "sections": {
+    "sec:side:gu6uj9:20:2": {
+      "id": "sec:side:gu6uj9:20:2",
+      "projectId": "side",
+      "name": "Sub tasks group A",
+      "filePath": "todos.md",
+      "lineNumber": 20,
+      "headingLevel": 2,
+      "parentId": null
+    },
+    "sec:side:gu6uj9:24:2": {
+      "id": "sec:side:gu6uj9:24:2",
+      "projectId": "side",
+      "name": "Sub tasks group B",
+      "filePath": "todos.md",
+      "lineNumber": 24,
+      "headingLevel": 2,
+      "parentId": null
     }
   },
   "tasks": {
@@ -37,7 +58,8 @@
       "energy": "low",
       "est": "30m",
       "area": "life",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
       "lineNumber": 7,
       "indentLevel": 0,
@@ -54,24 +76,10 @@
       "est": "15m",
       "due": "2025-12-10",
       "area": "life",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
       "lineNumber": 8,
-      "indentLevel": 0,
-      "parentId": null,
-      "childrenIds": []
-    },
-    "inbox:3": {
-      "globalId": "inbox:3",
-      "localId": "3",
-      "projectId": "inbox",
-      "text": "Test new task",
-      "completed": true,
-      "energy": "low",
-      "area": "life",
-      "created": "2025-12-09",
-      "filePath": "todos.md",
-      "lineNumber": 9,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": []
@@ -81,20 +89,20 @@
       "localId": "1",
       "projectId": "work",
       "text": "Review PR",
-      "completed": true,
+      "completed": false,
       "energy": "normal",
       "est": "45m",
       "due": "2025-12-09",
       "area": "work",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 13,
+      "lineNumber": 12,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": [
         "work:1.1",
-        "work:1.2",
-        "work:1.3"
+        "work:1.2"
       ]
     },
     "work:1.1": {
@@ -102,13 +110,14 @@
       "localId": "1.1",
       "projectId": "work",
       "text": "Check tests",
-      "completed": true,
+      "completed": false,
       "energy": "low",
       "est": "15m",
       "area": "work",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 14,
+      "lineNumber": 13,
       "indentLevel": 2,
       "parentId": "work:1",
       "childrenIds": []
@@ -118,29 +127,14 @@
       "localId": "1.2",
       "projectId": "work",
       "text": "Review code style",
-      "completed": true,
+      "completed": false,
       "energy": "low",
       "est": "15m",
       "area": "work",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 15,
-      "indentLevel": 2,
-      "parentId": "work:1",
-      "childrenIds": []
-    },
-    "work:1.3": {
-      "globalId": "work:1.3",
-      "localId": "1.3",
-      "projectId": "work",
-      "text": "Check unit tests",
-      "completed": false,
-      "energy": "low",
-      "est": "10m",
-      "area": "work",
-      "created": "2025-12-09",
-      "filePath": "todos.md",
-      "lineNumber": 16,
+      "lineNumber": 14,
       "indentLevel": 2,
       "parentId": "work:1",
       "childrenIds": []
@@ -154,9 +148,10 @@
       "energy": "high",
       "est": "2h",
       "area": "work",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 17,
+      "lineNumber": 15,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": []
@@ -171,7 +166,7 @@
       "area": "work",
       "created": "2025-12-01",
       "filePath": "todos.md",
-      "lineNumber": 18,
+      "lineNumber": 16,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": []
@@ -185,9 +180,10 @@
       "energy": "high",
       "est": "3h",
       "area": "sidebiz",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 22,
+      "lineNumber": 21,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": []
@@ -202,9 +198,10 @@
       "est": "1h",
       "bucket": "upcoming",
       "area": "sidebiz",
-      "created": "2025-12-09",
+      "created": "2025-12-22",
+      "updated": "2025-12-22",
       "filePath": "todos.md",
-      "lineNumber": 23,
+      "lineNumber": 22,
       "indentLevel": 0,
       "parentId": null,
       "childrenIds": []

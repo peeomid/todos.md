@@ -9,6 +9,29 @@ import type { Task, Energy, Priority } from '../schema/index.js';
 import { parseDateSpec, isDateInRange, isOverdue } from '../cli/date-utils.js';
 
 export type TaskFilter = (task: Task) => boolean;
+type QueryToken =
+  | { type: 'filter'; value: string }
+  | { type: 'or' }
+  | { type: 'lparen' }
+  | { type: 'rparen' };
+
+type QueryNode =
+  | { type: 'filter'; value: string }
+  | { type: 'and'; nodes: QueryNode[] }
+  | { type: 'or'; nodes: QueryNode[] };
+
+function splitCsv(value: string): string[] {
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function mergeCsv(existing: string | undefined, incoming: string): string {
+  const next = incoming.trim();
+  if (!next) return existing ?? '';
+  return existing ? `${existing},${next}` : next;
+}
 
 /**
  * Parse a key:value filter string into filter options
@@ -16,8 +39,8 @@ export type TaskFilter = (task: Task) => boolean;
 export interface FilterOptions {
   project?: string;
   area?: string;
-  energy?: Energy;
-  priority?: Priority;
+  energy?: string;
+  priority?: string;
   due?: string;
   plan?: string;
   bucket?: string;
@@ -45,6 +68,154 @@ export function parseFilterArg(arg: string): { key: string; value: string } | nu
   return { key, value };
 }
 
+export function tokenizeQuery(query: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  const pushCurrent = () => {
+    if (current) tokens.push(current);
+    current = '';
+  };
+
+  for (const ch of query) {
+    if (/\s/.test(ch)) {
+      pushCurrent();
+      continue;
+    }
+    if (ch === '(' || ch === ')' || ch === '|') {
+      pushCurrent();
+      tokens.push(ch);
+      continue;
+    }
+    current += ch;
+  }
+  pushCurrent();
+  return tokens.filter(Boolean);
+}
+
+export function isQueryOperatorToken(token: string): boolean {
+  if (token === '(' || token === ')' || token === '|') return true;
+  return token.toUpperCase() === 'OR';
+}
+
+function toQueryTokens(tokens: string[]): QueryToken[] {
+  const out: QueryToken[] = [];
+  for (const token of tokens) {
+    if (token === '(') {
+      out.push({ type: 'lparen' });
+      continue;
+    }
+    if (token === ')') {
+      out.push({ type: 'rparen' });
+      continue;
+    }
+    if (token === '|' || token.toUpperCase() === 'OR') {
+      out.push({ type: 'or' });
+      continue;
+    }
+    if (parseFilterArg(token)) {
+      out.push({ type: 'filter', value: token });
+    }
+  }
+  return out;
+}
+
+function parseQueryTokens(tokens: QueryToken[]): QueryNode {
+  let index = 0;
+
+  const peek = () => tokens[index];
+  const consume = () => tokens[index++];
+
+  const parsePrimary = (): QueryNode => {
+    const token = peek();
+    if (!token) {
+      throw new Error('Expected filter or "(" but reached end of query.');
+    }
+    if (token.type === 'filter') {
+      consume();
+      return { type: 'filter', value: token.value };
+    }
+    if (token.type === 'lparen') {
+      consume();
+      const expr = parseOr();
+      const next = peek();
+      if (!next || next.type !== 'rparen') {
+        throw new Error('Expected ")" to close group.');
+      }
+      consume();
+      return expr;
+    }
+    throw new Error(`Unexpected token '${token.type}'.`);
+  };
+
+  const parseAnd = (): QueryNode => {
+    const nodes: QueryNode[] = [];
+    while (true) {
+      const token = peek();
+      if (!token || token.type === 'or' || token.type === 'rparen') break;
+      nodes.push(parsePrimary());
+    }
+    if (nodes.length === 0) {
+      throw new Error('Expected filter or "(" after operator.');
+    }
+    return nodes.length === 1 ? nodes[0]! : { type: 'and', nodes };
+  };
+
+  const parseOr = (): QueryNode => {
+    let node = parseAnd();
+    const nodes: QueryNode[] = [node];
+    while (peek()?.type === 'or') {
+      consume();
+      nodes.push(parseAnd());
+    }
+    node = nodes.length === 1 ? nodes[0]! : { type: 'or', nodes };
+    return node;
+  };
+
+  const root = parseOr();
+  if (index < tokens.length) {
+    const token = tokens[index]!;
+    throw new Error(`Unexpected token '${token.type}'.`);
+  }
+  return root;
+}
+
+function toDnfGroups(node: QueryNode): string[][] {
+  switch (node.type) {
+    case 'filter':
+      return [[node.value]];
+    case 'or': {
+      const out: string[][] = [];
+      for (const child of node.nodes) {
+        out.push(...toDnfGroups(child));
+      }
+      return out;
+    }
+    case 'and': {
+      let groups: string[][] = [[]];
+      for (const child of node.nodes) {
+        const childGroups = toDnfGroups(child);
+        const next: string[][] = [];
+        for (const group of groups) {
+          for (const childGroup of childGroups) {
+            next.push([...group, ...childGroup]);
+          }
+        }
+        groups = next;
+      }
+      return groups;
+    }
+  }
+}
+
+export function parseQueryToFilterGroups(input: string | string[]): string[][] {
+  const query = Array.isArray(input) ? input.join(' ') : input;
+  const rawTokens = tokenizeQuery(query);
+  const tokens = toQueryTokens(rawTokens);
+  if (tokens.length === 0) return [];
+  const ast = parseQueryTokens(tokens);
+  return toDnfGroups(ast).map((group) => group.filter(Boolean));
+}
+
 /**
  * Parse multiple filter arguments into FilterOptions
  */
@@ -58,19 +229,23 @@ export function parseFilterArgs(args: string[]): FilterOptions {
     const { key, value } = parsed;
     switch (key) {
       case 'project':
-        options.project = value;
+        options.project = mergeCsv(options.project, value);
         break;
       case 'area':
-        options.area = value;
+        options.area = mergeCsv(options.area, value);
         break;
       case 'energy':
-        if (value === 'low' || value === 'normal' || value === 'high') {
-          options.energy = value;
+        {
+          const parts = splitCsv(value);
+          const valid = parts.filter((v) => v === 'low' || v === 'normal' || v === 'high');
+          if (valid.length > 0) options.energy = mergeCsv(options.energy, valid.join(','));
         }
         break;
       case 'priority':
-        if (value === 'high' || value === 'normal' || value === 'low') {
-          options.priority = value;
+        {
+          const parts = splitCsv(value);
+          const valid = parts.filter((v) => v === 'high' || v === 'normal' || v === 'low');
+          if (valid.length > 0) options.priority = mergeCsv(options.priority, valid.join(','));
         }
         break;
       case 'due':
@@ -80,7 +255,7 @@ export function parseFilterArgs(args: string[]): FilterOptions {
         options.plan = value;
         break;
       case 'bucket':
-        options.bucket = value;
+        options.bucket = mergeCsv(options.bucket, value);
         break;
       case 'overdue':
         options.overdue = value === 'true';
@@ -91,7 +266,7 @@ export function parseFilterArgs(args: string[]): FilterOptions {
         }
         break;
       case 'tags':
-        options.tags = value;
+        options.tags = mergeCsv(options.tags, value);
         break;
       case 'parent':
         options.parent = value;
@@ -112,14 +287,26 @@ export function parseFilterArgs(args: string[]): FilterOptions {
  * Filter by project ID
  */
 export function filterByProject(projectId: string): TaskFilter {
-  return (task) => task.projectId === projectId;
+  const ids = splitCsv(projectId);
+  if (ids.length <= 1) {
+    const id = ids[0] ?? projectId;
+    return (task) => task.projectId === id;
+  }
+  const set = new Set(ids);
+  return (task) => set.has(task.projectId);
 }
 
 /**
  * Filter by area
  */
 export function filterByArea(area: string): TaskFilter {
-  return (task) => task.area === area;
+  const areas = splitCsv(area);
+  if (areas.length <= 1) {
+    const a = areas[0] ?? area;
+    return (task) => task.area === a;
+  }
+  const set = new Set(areas);
+  return (task) => (task.area ? set.has(task.area) : false);
 }
 
 /**
@@ -136,11 +323,53 @@ export function filterByPriority(priority: Priority): TaskFilter {
   return (task) => task.priority === priority;
 }
 
+function filterByEnergyAny(energyCsv: string): TaskFilter {
+  const energies = splitCsv(energyCsv).filter((v): v is Energy => v === 'low' || v === 'normal' || v === 'high');
+  if (energies.length <= 1) {
+    const e = energies[0];
+    return e ? filterByEnergy(e) : () => false;
+  }
+  const set = new Set(energies);
+  return (task) => (task.energy ? set.has(task.energy) : false);
+}
+
+function filterByPriorityAny(priorityCsv: string): TaskFilter {
+  const priorities = splitCsv(priorityCsv).filter((v): v is Priority => v === 'high' || v === 'normal' || v === 'low');
+  if (priorities.length <= 1) {
+    const p = priorities[0];
+    return p ? filterByPriority(p) : () => false;
+  }
+  const set = new Set(priorities);
+  return (task) => (task.priority ? set.has(task.priority) : false);
+}
+
 /**
  * Filter by bucket
  */
 export function filterByBucket(bucket: string): TaskFilter {
-  return (task) => task.bucket === bucket;
+  const values = splitCsv(bucket);
+  const include: string[] = [];
+  const exclude: string[] = [];
+
+  for (const v of values) {
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('!') && trimmed.length > 1) exclude.push(trimmed.slice(1));
+    else include.push(trimmed);
+  }
+
+  const includeSet = new Set(include);
+  const excludeSet = new Set(exclude);
+
+  // Semantics:
+  // - If includes are present, task.bucket must be one of them (and also not excluded).
+  // - If only excludes are present, match all tasks except those with a matching bucket.
+  return (task) => {
+    const b = task.bucket;
+    if (b && excludeSet.has(b)) return false;
+    if (includeSet.size > 0) return b ? includeSet.has(b) : false;
+    return true;
+  };
 }
 
 /**
@@ -242,6 +471,33 @@ export function composeFilters(filters: TaskFilter[]): TaskFilter {
     return () => true;
   }
   return (task) => filters.every((filter) => filter(task));
+}
+
+export function buildFilterGroups(groups: string[][]): TaskFilter[] {
+  return groups.map((group) => {
+    const options = parseFilterArgs(group);
+    const filters = buildFiltersFromOptions(options);
+    return composeFilters(filters);
+  });
+}
+
+export function groupHasFilterKey(group: string[], key: string): boolean {
+  return group.some((token) => parseFilterArg(token)?.key === key);
+}
+
+export function applyDefaultStatusToGroups(
+  groups: string[][],
+  status: 'open' | 'done' | 'all'
+): string[][] {
+  const base = groups.length > 0 ? groups : [[]];
+  return base.map((group) => (groupHasFilterKey(group, 'status') ? group : [...group, `status:${status}`]));
+}
+
+export function composeFilterGroups(groups: TaskFilter[]): TaskFilter {
+  if (groups.length === 0) {
+    return () => true;
+  }
+  return (task) => groups.some((filter) => filter(task));
 }
 
 /**
@@ -420,10 +676,10 @@ export function buildFiltersFromOptions(options: FilterOptions): TaskFilter[] {
     filters.push(filterByArea(options.area));
   }
   if (options.energy) {
-    filters.push(filterByEnergy(options.energy));
+    filters.push(filterByEnergyAny(options.energy));
   }
   if (options.priority) {
-    filters.push(filterByPriority(options.priority));
+    filters.push(filterByPriorityAny(options.priority));
   }
   if (options.due) {
     filters.push(filterByDue(options.due));
@@ -457,8 +713,5 @@ export function buildFiltersFromOptions(options: FilterOptions): TaskFilter[] {
 }
 
 export function parseQueryString(query: string): string[] {
-  return query
-    .split(/\s+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
+  return tokenizeQuery(query);
 }

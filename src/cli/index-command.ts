@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { buildIndex } from '../indexer/index.js';
 import { writeIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
 import { boldText, dimText, greenText, yellowText } from './terminal.js';
 import { FileNotFoundError } from './errors.js';
@@ -19,12 +19,21 @@ export function handleIndexCommand(args: string[]): void {
 }
 
 function parseIndexFlags(args: string[]): IndexOptions {
-  const boolFlags = extractBooleanFlags(args, ['--quiet', '-q', '--json']);
+  const boolFlags = extractBooleanFlags(args, [
+    '--quiet',
+    '-q',
+    '--json',
+    '--global-config',
+    '-G',
+  ]);
   const valueFlags = extractFlags(args, ['--output', '-o', '--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);

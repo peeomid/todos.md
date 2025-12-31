@@ -3,7 +3,7 @@
  */
 
 import { readIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import type { Task, TaskIndex } from '../schema/index.js';
@@ -21,10 +21,13 @@ export function handleShowCommand(args: string[]): void {
 }
 
 function parseShowFlags(args: string[]): ShowOptions {
-  const boolFlags = extractBooleanFlags(args, ['--json']);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 

@@ -5,24 +5,27 @@
  */
 
 import { readIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import type { Task } from '../schema/index.js';
 import {
   parseFilterArgs,
-  buildFiltersFromOptions,
   composeFilters,
+  parseQueryToFilterGroups,
+  buildFilterGroups,
+  composeFilterGroups,
+  applyDefaultStatusToGroups,
   filterByText,
   sortTasks,
   type FilterOptions,
-  type SortField,
 } from './list-filters.js';
-import { formatJson, type FormatStyle } from './list-formatters.js';
+import { type FormatStyle } from './list-formatters.js';
 import { cyanText, dimText } from './terminal.js';
 
 interface SearchOptions {
   searchText: string;
+  filterGroups: string[][];
   filterOptions: FilterOptions;
   json: boolean;
   format: FormatStyle;
@@ -35,7 +38,7 @@ export function handleSearchCommand(args: string[]): void {
 }
 
 function parseSearchFlags(args: string[]): SearchOptions {
-  const boolFlags = extractBooleanFlags(args, ['--json']);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
 
   const valueFlags = extractFlags(args, [
     '--format',
@@ -46,7 +49,10 @@ function parseSearchFlags(args: string[]): SearchOptions {
     '-o',
   ]);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
@@ -58,12 +64,16 @@ function parseSearchFlags(args: string[]): SearchOptions {
 
   // Remove search text from args before parsing filters
   const filterArgs = args.filter((arg) => arg !== searchText);
-  const filterOptions = parseFilterArgs(filterArgs);
-
-  // Default status to 'open' if not specified
-  if (!filterOptions.status) {
-    filterOptions.status = 'open';
+  let filterGroups: string[][];
+  try {
+    filterGroups = parseQueryToFilterGroups(filterArgs);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid query syntax.';
+    throw new CliUsageError(message);
   }
+
+  filterGroups = applyDefaultStatusToGroups(filterGroups, 'open');
+  const filterOptions = parseFilterArgs(filterGroups[0] ?? []);
 
   // Validate format
   const formatRaw = valueFlags['--format'] ?? valueFlags['-f'] ?? 'compact';
@@ -74,6 +84,7 @@ function parseSearchFlags(args: string[]): SearchOptions {
 
   return {
     searchText,
+    filterGroups,
     filterOptions,
     json: boolFlags.has('--json'),
     format,
@@ -89,11 +100,12 @@ function runSearch(options: SearchOptions): void {
   }
 
   // Build filters from options + text filter
-  const filters = buildFiltersFromOptions(options.filterOptions);
-  filters.push(filterByText(options.searchText));
+  const groupFilters = buildFilterGroups(options.filterGroups).map((groupFilter) =>
+    composeFilters([groupFilter, filterByText(options.searchText)])
+  );
 
   // Apply filters
-  const composedFilter = composeFilters(filters);
+  const composedFilter = composeFilterGroups(groupFilters);
   const tasks = Object.values(index.tasks).filter(composedFilter);
 
   // Sort by project (default)
@@ -106,6 +118,7 @@ function runSearch(options: SearchOptions): void {
       filters: Object.fromEntries(
         Object.entries(options.filterOptions).filter(([, v]) => v !== undefined)
       ),
+      filterGroups: options.filterGroups,
       tasks: sortedTasks.map((task) => ({
         globalId: task.globalId,
         text: task.text,
@@ -161,6 +174,7 @@ export function printSearchHelp(): void {
     '  bucket:<name>         Filter by bucket',
     '  due:<date>            Filter by due date spec (today, tomorrow, this-week, next-week, YYYY-MM-DD, YYYY-MM-DD:YYYY-MM-DD)',
     '  plan:<date>           Filter by plan date spec (same formats as due:)',
+    '  Use "|" or "OR" for OR (group with parentheses).',
     '  ... (see tmd list --help for all filters)',
     '',
     'Options:',

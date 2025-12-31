@@ -5,19 +5,19 @@
  */
 
 import { readIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import type { Task, Energy, Priority, TaskIndex } from '../schema/index.js';
 import {
   parseFilterArgs,
-  buildFiltersFromOptions,
-  composeFilters,
-  filterByStatus,
+  parseQueryToFilterGroups,
+  buildFilterGroups,
+  composeFilterGroups,
+  applyDefaultStatusToGroups,
   sortTasks,
   groupTasks,
   type FilterOptions,
-  type TaskFilter,
   type SortField,
   type GroupField,
 } from './list-filters.js';
@@ -31,7 +31,9 @@ import {
 
 interface ListOptions {
   // Filters (from key:value syntax or legacy flags)
+  filterGroups: string[][];
   filterOptions: FilterOptions;
+  query: string;
 
   // Display
   json: boolean;
@@ -50,7 +52,7 @@ export function handleListCommand(args: string[]): void {
 }
 
 function parseListFlags(args: string[]): ListOptions {
-  const boolFlags = extractBooleanFlags(args, ['--json']);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
 
   const valueFlags = extractFlags(args, [
     '--format',
@@ -67,17 +69,26 @@ function parseListFlags(args: string[]): ListOptions {
     '-o',
   ]);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
   // Parse key:value filters from remaining args
-  const filterOptions = parseFilterArgs(args);
+  const query = args.join(' ');
+  let filterGroups: string[][];
+  try {
+    filterGroups = parseQueryToFilterGroups(args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid query syntax.';
+    throw new CliUsageError(message);
+  }
 
   // Default status to 'open' if not specified
-  if (!filterOptions.status) {
-    filterOptions.status = 'open';
-  }
+  filterGroups = applyDefaultStatusToGroups(filterGroups, 'open');
+  const filterOptions = parseFilterArgs(filterGroups[0] ?? []);
 
   // Validate format
   const formatRaw = valueFlags['--format'] ?? valueFlags['-f'] ?? 'compact';
@@ -111,7 +122,9 @@ function parseListFlags(args: string[]): ListOptions {
   }
 
   return {
+    filterGroups,
     filterOptions,
+    query,
     json: boolFlags.has('--json'),
     format,
     groupBy,
@@ -129,10 +142,10 @@ function runList(options: ListOptions): void {
   }
 
   // Build filters from options
-  const filters = buildFiltersFromOptions(options.filterOptions);
+  const groupFilters = buildFilterGroups(options.filterGroups);
 
   // Apply filters
-  const composedFilter = composeFilters(filters);
+  const composedFilter = composeFilterGroups(groupFilters);
   let tasks = Object.values(index.tasks).filter(composedFilter);
 
   // Sort
@@ -145,7 +158,11 @@ function runList(options: ListOptions): void {
 
   // Format output
   if (options.json) {
-    const output = formatJson(tasks, options.filterOptions);
+    const output = formatJson(tasks, {
+      filters: options.filterOptions,
+      filterGroups: options.filterGroups,
+      query: options.query,
+    });
     console.log(output);
     return;
   }
@@ -217,6 +234,8 @@ export function printListHelp(): void {
     '  parent:<id>           Show children of a task',
     '  top-level:true        Show only top-level tasks',
     '  text:<query>          Full-text search in task text',
+    '  Use "|" or "OR" for OR (group with parentheses):',
+    '    (bucket:today | plan:today) priority:high',
     '',
     'Display Options:',
     '  --json                Output as JSON',

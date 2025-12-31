@@ -16,6 +16,7 @@ import { handleSyncCommand, printSyncHelp } from './cli/sync-command.js';
 import { handleBlockTemplateCommand, printBlockTemplateHelp } from './cli/block-template-command.js';
 import { handleInteractiveCommand, printInteractiveHelp } from './cli/interactive-command.js';
 import { handleConfigCommand, printConfigHelp } from './cli/config-command.js';
+import { handleInitCommand, printInitHelp } from './cli/init-command.js';
 import { CliUsageError } from './cli/errors.js';
 import { extractBooleanFlags } from './cli/flag-utils.js';
 
@@ -23,6 +24,11 @@ const VERSION = '0.1.0';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const leadingGlobalConfigFlags = new Set<string>();
+
+  while (args[0] === '--global-config' || args[0] === '-G') {
+    leadingGlobalConfigFlags.add(args.shift()!);
+  }
 
   if (args.length === 0) {
     printHelp();
@@ -48,6 +54,10 @@ async function main(): Promise<void> {
     printHelp();
     process.exit(1);
     return;
+  }
+
+  if (leadingGlobalConfigFlags.size > 0 && command !== 'help') {
+    args.unshift('--global-config');
   }
 
   // Check for command-specific help
@@ -191,6 +201,14 @@ async function main(): Promise<void> {
           printConfigHelp();
         } else {
           handleConfigCommand(args);
+        }
+        break;
+
+      case 'init':
+        if (showHelp) {
+          printInitHelp();
+        } else {
+          handleInitCommand(args);
         }
         break;
 

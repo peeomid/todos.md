@@ -3,11 +3,11 @@
  */
 
 import { readIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import { boldText, dimText, greenText, cyanText } from './terminal.js';
-import { parseFilterArgs, buildFiltersFromOptions, composeFilters, type FilterOptions } from './list-filters.js';
+import { parseQueryToFilterGroups, buildFilterGroups, composeFilterGroups } from './list-filters.js';
 import { parseDateSpec, formatDate, isOverdue } from './date-utils.js';
 import type { Task, TaskIndex } from '../schema/index.js';
 
@@ -15,7 +15,7 @@ type Period = 'today' | 'last-7d' | 'last-30d' | 'this-week';
 type GroupBy = 'project' | 'area' | 'bucket' | 'energy';
 
 interface StatsOptions {
-  filterOptions: FilterOptions;
+  filterGroups: string[][];
   period: Period;
   groupBy: GroupBy;
   json: boolean;
@@ -56,7 +56,7 @@ export function handleStatsCommand(args: string[]): void {
 }
 
 function parseStatsFlags(args: string[]): StatsOptions {
-  const boolFlags = extractBooleanFlags(args, ['--json']);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
 
   const valueFlags = extractFlags(args, [
     '--period',
@@ -67,12 +67,21 @@ function parseStatsFlags(args: string[]): StatsOptions {
     '-o',
   ]);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
   // Parse filters
-  const filterOptions = parseFilterArgs(args);
+  let filterGroups: string[][];
+  try {
+    filterGroups = parseQueryToFilterGroups(args);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid query syntax.';
+    throw new CliUsageError(message);
+  }
 
   // Validate period
   const periodRaw = valueFlags['--period'] ?? 'last-7d';
@@ -89,7 +98,7 @@ function parseStatsFlags(args: string[]): StatsOptions {
   const groupBy = groupByRaw as GroupBy;
 
   return {
-    filterOptions,
+    filterGroups,
     period,
     groupBy,
     json: boolFlags.has('--json'),
@@ -105,8 +114,8 @@ function runStats(options: StatsOptions): void {
   }
 
   // Build and apply filters (without status filter to count all)
-  const filters = buildFiltersFromOptions(options.filterOptions);
-  const composedFilter = composeFilters(filters);
+  const groupFilters = buildFilterGroups(options.filterGroups);
+  const composedFilter = composeFilterGroups(groupFilters);
   const allTasks = Object.values(index.tasks).filter(composedFilter);
 
   // Calculate stats

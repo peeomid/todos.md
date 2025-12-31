@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { lintFiles, type LintIssue } from '../linter/index.js';
-import { loadConfig, resolveFiles } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles } from '../config/loader.js';
 import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
 import { boldText, dimText, redText, yellowText, cyanText } from './terminal.js';
 import { FileNotFoundError } from './errors.js';
@@ -19,12 +19,22 @@ export function handleLintCommand(args: string[]): void {
 }
 
 function parseLintFlags(args: string[]): LintOptions {
-  const boolFlags = extractBooleanFlags(args, ['--fix', '--quiet', '-q', '--json']);
+  const boolFlags = extractBooleanFlags(args, [
+    '--fix',
+    '--quiet',
+    '-q',
+    '--json',
+    '--global-config',
+    '-G',
+  ]);
   const valueFlags = extractFlags(args, ['--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);

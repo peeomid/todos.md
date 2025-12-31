@@ -84,4 +84,19 @@ describe('config loader precedence', () => {
     const resolved = resolveFiles(config, ['override.md']);
     expect(resolved).toEqual(['override.md']);
   });
+
+  it('accepts interactive.autoEnrichOnReload', async () => {
+    fs.writeFileSync(
+      path.join(tempDir, '.todosmd.json'),
+      JSON.stringify({
+        interactive: { autoEnrichOnReload: false },
+      }),
+      'utf-8'
+    );
+
+    vi.resetModules();
+    const { loadConfig } = await import('../src/config/loader.js');
+    const config = loadConfig();
+    expect(config.interactive?.autoEnrichOnReload).toBe(false);
+  });
 });

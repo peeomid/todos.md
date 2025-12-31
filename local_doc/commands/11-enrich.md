@@ -95,7 +95,13 @@ Scan task text for @tags:
 
 ### 2. Auto-generate Missing IDs
 
-Tasks without `id:` get the next available ID in their project.
+Tasks without `id:` get the next available ID **within their parent context**, based on indentation:
+
+- **Top-level tasks** (no indentation relative to the current list block) get the next integer ID in the project: `1`, `2`, `3`, …
+- **Subtasks** (indented under a parent task) get the next dotted ID under that parent: `8.1`, `8.2`, …
+- **Deeper nesting** continues the pattern: `8.2.1`, `8.2.2`, …
+
+Enrich uses **indentation** to determine parent/child relationships when generating missing IDs.
 
 ### 3. Add `created` Date
 

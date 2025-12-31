@@ -18,6 +18,7 @@ export function printHelp(message?: string): void {
     '',
     formatSection('Commands', [
       ['help', 'Show this help'],
+      ['init', 'Scaffold a new todosmd workspace'],
       ['lint', 'Validate markdown files for format issues'],
       ['index', 'Parse files and generate todos.json'],
       ['enrich', 'Convert shorthands and auto-generate IDs'],
@@ -38,6 +39,7 @@ export function printHelp(message?: string): void {
     formatSection('Global flags', [
       ['--file, -f <path>', 'Input file (repeatable)'],
       ['--config, -c <path>', 'Path to config file'],
+      ['--global-config, -G', 'Force using the global config file'],
       ['--output, -o <path>', 'Output file path'],
       ['--json', 'Output as JSON'],
       ['--help, -h', 'Show help'],
@@ -60,7 +62,8 @@ export function printHelp(message?: string): void {
     formatSection('Config', [
       ['Project config', 'Nearest .todosmd.json (walks up from cwd)'],
       ['Global config', '~/.config/todosmd/config.json'],
-      ['Key fields', 'files (inputs), output (index path), views (sync targets)'],
+      ['Key fields', 'files (inputs), output (index path), views (sync targets), interactive.views (TUI custom views)'],
+      ['More', 'tmd help config'],
     ]),
     '',
     formatSection('Common workflows', [

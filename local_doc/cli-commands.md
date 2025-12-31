@@ -251,6 +251,7 @@ Available on all commands:
 |------|-------|-------------|
 | `--file <path>` | `-f` | Input file (repeatable) |
 | `--config <path>` | `-c` | Path to config file |
+| `--global-config` | `-G` | Force using the global config file |
 | `--project <name>` | `-p` | Use named project from global config |
 | `--json` | | Output as JSON |
 | `--help` | `-h` | Show help |

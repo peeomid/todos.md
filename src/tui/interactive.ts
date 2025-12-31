@@ -7,8 +7,10 @@ import type { TaskIndex, Task, Project, Priority } from '../schema/index.js';
 import {
   parseQueryString,
   parseFilterArg,
-  parseFilterArgs,
-  buildFiltersFromOptions,
+  parseQueryToFilterGroups,
+  buildFilterGroups,
+  composeFilterGroups,
+  isQueryOperatorToken,
   composeFilters,
   filterByText,
   groupTasks,
@@ -21,11 +23,14 @@ import { deleteTaskSubtree } from '../editor/task-deleter.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
 import { parseDate, parseRelativeDate, formatDate } from '../cli/date-utils.js';
 import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
-import { insertTask, type TaskMetadata } from '../editor/task-inserter.js';
+import { insertTask, insertTaskAfterTaskSameLevel, insertTaskUnderSection, type TaskMetadata } from '../editor/task-inserter.js';
+import { enrichFiles } from '../enricher/index.js';
 import { isSpaceKeyName } from './key-utils.js';
+import { shouldAllowGlobalQuit } from './key-policy.js';
 import { getStickyHeaderLabel } from './sticky-header.js';
 import { getFooterHeight } from './layout.js';
 import { renderLabeledInputField } from './input-render.js';
+import { getNowToggleChanges } from './bucket-toggle.js';
 import {
   formatBucketSymbolShorthand,
   formatBucketTagShorthand,
@@ -45,6 +50,8 @@ import {
 } from './autocomplete.js';
 import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
 import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor, type TextInputState } from './text-input.js';
+import { formatAutoReloadLabel, shouldShowAutoReloadIndicator, type AutoReloadIndicator } from './auto-reload.js';
+import { orderTasksForTreeView } from './task-order.js';
 
 type Term = any;
 
@@ -92,6 +99,7 @@ interface SessionState {
   collapsedTasks: Set<string>;
   collapsedAreas: Set<string>;
   fileMtimes: Map<string, number>;
+  autoReload: AutoReloadIndicator | null;
   filteredTasks: Task[];
   renderRows: RenderRow[];
   filteredProjects: Project[];
@@ -127,6 +135,51 @@ function normalizeStatusInQuery(query: string, statusMode: 'open' | 'all'): stri
 function ensureTrailingSpace(input: string): string {
   const trimmedEnd = input.replace(/\s+$/, '');
   return trimmedEnd ? `${trimmedEnd} ` : '';
+}
+
+function toggleBucketFocusInQuery(query: string, bucket: 'today' | 'upcoming' | 'anytime' | 'someday'): string {
+  const tokens = parseQueryString(query);
+
+  const include = new Set<string>();
+  const exclude = new Set<string>();
+  for (const token of tokens) {
+    const parsed = parseFilterArg(token);
+    if (parsed?.key !== 'bucket') continue;
+    for (const part of parsed.value.split(',').map((x) => x.trim()).filter(Boolean)) {
+      if (part.startsWith('!') && part.length > 1) exclude.add(part.slice(1));
+      else include.add(part);
+    }
+  }
+
+  const isExclusive =
+    include.size === 1 && include.has(bucket) && !exclude.has(bucket);
+
+  const nextTokens = tokens.filter((t) => parseFilterArg(t)?.key !== 'bucket');
+  if (isExclusive) {
+    return nextTokens.join(' ').trim();
+  }
+
+  nextTokens.push(`bucket:${bucket}`);
+  return nextTokens.join(' ').trim();
+}
+
+function deriveSingleProjectIdFromGroups(groups: string[][]): string | null {
+  if (groups.length === 0) return null;
+  let candidate: string | null = null;
+  for (const group of groups) {
+    let groupProject: string | null = null;
+    for (const token of group) {
+      const parsed = parseFilterArg(token);
+      if (parsed?.key !== 'project') continue;
+      if (parsed.value.includes(',')) return null;
+      if (groupProject && groupProject !== parsed.value) return null;
+      groupProject = parsed.value;
+    }
+    if (!groupProject) return null;
+    if (candidate && candidate !== groupProject) return null;
+    candidate = groupProject;
+  }
+  return candidate;
 }
 
 function describePriorityOrderMode(mode: PriorityOrderMode): string {
@@ -217,7 +270,7 @@ function buildViews(config: Config): InteractiveView[] {
   const builtins: InteractiveView[] = [
     { key: '0', name: 'All', query: 'status:open', sort: 'project,priority,plan,due', kind: 'tasks' },
     { key: '1', name: 'Now', query: 'status:open bucket:now', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '2', name: 'Today', query: 'status:open bucket:today', sort: 'priority,plan,due', kind: 'tasks' },
+    { key: '2', name: 'Today', query: 'status:open (bucket:today | plan:today | due:today)', sort: 'priority,plan,due', kind: 'tasks' },
     { key: '3', name: 'Upcoming', query: 'status:open bucket:upcoming', sort: 'priority,plan,due', kind: 'tasks' },
     { key: '4', name: 'Anytime', query: 'status:open bucket:anytime', sort: 'priority,plan,due', kind: 'tasks' },
     { key: '5', name: 'Someday', query: 'status:open bucket:someday', sort: 'priority,plan,due', kind: 'tasks' },
@@ -340,8 +393,13 @@ function getFooterHelpLines(
       '[space/x] done',
       '[p] pri',
       '[b] bucket',
+      '[T/U/Y/S] filter buckets',
+      '[t/!] today',
+      '[u/>] upcoming',
+      '[y/~] anytime',
+      '[s] someday',
       '[n] now',
-      '[t] plan',
+      '[P] plan',
       '[d] due',
       '[e] edit',
       '[a] add task',
@@ -360,8 +418,13 @@ function getFooterHelpLines(
     '[space/x] done',
     '[p] priority',
     '[b] bucket',
+    '[T/U/Y/S] filter buckets',
+    '[t/!] today',
+    '[u/>] upcoming',
+    '[y/~] anytime',
+    '[s] someday',
     '[n] now',
-    '[t] plan',
+    '[P] plan',
     '[d] due',
     '[e] edit',
     '[a] add',
@@ -534,19 +597,24 @@ function render(state: SessionState, term: Term): void {
   const queryRaw = state.search.active ? state.search.input.value : state.query;
   const query = normalizeStatusInQuery(queryRaw, state.statusMode);
   const flags = state.statusMode === 'open' ? 'hide-done' : 'show-done';
-  const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}`;
+  const nowMs = Date.now();
+  const autoReload = shouldShowAutoReloadIndicator(state.autoReload, nowMs) ? state.autoReload : null;
+  const autoReloadSuffix = autoReload ? ` | ${formatAutoReloadLabel(autoReload.files)}` : '';
+  const queryLine = `View: ${modeTitle} (${view.key}) | Query: ${query} | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}${autoReloadSuffix}`;
   term.moveTo(1, 3);
   if (state.colorsDisabled) {
     style.dim(truncate(queryLine, width));
   } else {
-    writeSegments(
-      [
-        { text: `View: ${modeTitle} (${view.key}) | Query: `, style: 'dim' },
-        { text: query, style: 'queryAccent' },
-        { text: ` | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}`, style: 'dim' },
-      ],
-      width
-    );
+    const segments: { text: string; style: keyof typeof style }[] = [
+      { text: `View: ${modeTitle} (${view.key}) | Query: `, style: 'dim' },
+      { text: query, style: 'queryAccent' },
+      { text: ` | Flags: ${flags}, ${describePriorityOrderMode(state.priorityOrder)}`, style: 'dim' },
+    ];
+    if (autoReload) {
+      segments.push({ text: ' | ', style: 'dim' });
+      segments.push({ text: formatAutoReloadLabel(autoReload.files), style: 'yellow' });
+    }
+    writeSegments(segments, width);
     term.styleReset();
   }
 
@@ -635,8 +703,11 @@ function render(state: SessionState, term: Term): void {
         if (selected) {
           term.inverse();
         } else if (r.kind === 'task' && r.task.bucket === 'now') {
-          // Subtle background to make "now" tasks stand out.
-          term.bgColorRgb(0, 70, 30);
+          // "Now" tasks should stand out the most.
+          term.bgColorRgb(0, 90, 40);
+        } else if (r.kind === 'task' && r.task.bucket === 'today') {
+          // "Today" tasks get a lighter (less prominent) background than "now".
+          term.bgColorRgb(0, 35, 75);
         }
       }
 
@@ -986,15 +1057,25 @@ function recompute(state: SessionState): void {
   const queryString = state.search.active ? state.search.input.value : state.query;
   const normalized = normalizeStatusInQuery(queryString, state.statusMode);
   const tokens = parseQueryString(normalized);
-  const structured = tokens.filter((t) => parseFilterArg(t) !== null);
-  const freeText = tokens.filter((t) => parseFilterArg(t) === null);
-
-  const options = parseFilterArgs(structured);
-  const filters = buildFiltersFromOptions(options);
-  for (const word of freeText) {
-    filters.push(filterByText(word));
+  const freeText = tokens.filter((t) => parseFilterArg(t) === null && !isQueryOperatorToken(t));
+  let filterGroups: string[][];
+  try {
+    filterGroups = parseQueryToFilterGroups(normalized);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid query syntax.';
+    state.message = `Invalid query: ${message}`;
+    state.filteredTasks = [];
+    state.filteredProjects = [];
+    state.renderRows = [];
+    return;
   }
-  const composed = composeFilters(filters);
+
+  const baseGroups = filterGroups.length > 0 ? filterGroups : [[]];
+  const textFilters = freeText.map((word) => filterByText(word));
+  const groupFilters = buildFilterGroups(baseGroups).map((groupFilter) =>
+    textFilters.length === 0 ? groupFilter : composeFilters([groupFilter, ...textFilters])
+  );
+  const composed = composeFilterGroups(groupFilters);
 
   let tasks = Object.values(state.index.tasks).filter(composed);
 
@@ -1028,6 +1109,8 @@ function recompute(state: SessionState): void {
 
   if (state.groupBy === 'project') {
     const grouped = groupTasks(tasks, 'project');
+    const treeSortFields = fields.filter((f) => f !== 'project');
+    const treePriorityOrder = priorityOrderOverride === 'low-first' ? 'low-first' : 'high-first';
 
     const isHiddenByCollapsedAncestor = (task: Task): boolean => {
       let current = task.parentId;
@@ -1045,7 +1128,7 @@ function recompute(state: SessionState): void {
     const pushProjectTaskRows = (projectId: string, group: Task[], baseIndent: number): void => {
       const projectSections = Object.values(state.index.sections).filter((s) => s.projectId === projectId);
       if (projectSections.length === 0) {
-        for (const task of group) {
+        for (const task of orderTasksForTreeView(group, treeSortFields, { priorityOrder: treePriorityOrder })) {
           if (isHiddenByCollapsedAncestor(task)) continue;
           const idx = state.renderRows.length;
           state.renderRows.push({ kind: 'task', task, indent: baseIndent, sectionId: null });
@@ -1103,7 +1186,6 @@ function recompute(state: SessionState): void {
 
       const tasksBySection = new Map<string | null, Task[]>();
       for (const task of group) {
-        if (isHiddenByCollapsedAncestor(task)) continue;
         const sectionId = findSectionIdForTask(task);
         const arr = tasksBySection.get(sectionId) ?? [];
         arr.push(task);
@@ -1132,7 +1214,8 @@ function recompute(state: SessionState): void {
       for (const id of sectionById.keys()) computeTotal(id);
 
       // Render tasks that have no section heading above them.
-      for (const task of tasksBySection.get(null) ?? []) {
+      for (const task of orderTasksForTreeView(tasksBySection.get(null) ?? [], treeSortFields, { priorityOrder: treePriorityOrder })) {
+        if (isHiddenByCollapsedAncestor(task)) continue;
         const idx = state.renderRows.length;
         state.renderRows.push({ kind: 'task', task, indent: baseIndent, sectionId: null });
         taskRowIndexById.set(task.globalId, idx);
@@ -1157,7 +1240,8 @@ function recompute(state: SessionState): void {
         for (const cid of childrenByParent.get(sectionId) ?? []) {
           renderSection(cid);
         }
-        for (const task of tasksBySection.get(sectionId) ?? []) {
+        for (const task of orderTasksForTreeView(tasksBySection.get(sectionId) ?? [], treeSortFields, { priorityOrder: treePriorityOrder })) {
+          if (isHiddenByCollapsedAncestor(task)) continue;
           const tIdx = state.renderRows.length;
           state.renderRows.push({ kind: 'task', task, indent: taskIndent, sectionId });
           taskRowIndexById.set(task.globalId, tIdx);
@@ -1169,8 +1253,9 @@ function recompute(state: SessionState): void {
       }
     };
 
+    const explicitProjectIdFromQuery = deriveSingleProjectIdFromGroups(baseGroups);
     const explicitProjectId =
-      (inProjectDrilldown ? state.projects.drilldownProjectId : null) ?? options.project ?? null;
+      (inProjectDrilldown ? state.projects.drilldownProjectId : null) ?? explicitProjectIdFromQuery ?? null;
 
     const projectIdsToRender: string[] =
       explicitProjectId ? [explicitProjectId] : [...grouped.keys()].sort((a, b) => a.localeCompare(b));
@@ -1315,22 +1400,6 @@ function getSelectedProject(state: SessionState): Project | null {
   return state.index.projects[id] ?? null;
 }
 
-async function confirmReload(term: Term, state: SessionState, filePath: string): Promise<boolean> {
-  term.clear();
-  term.moveTo(1, 1);
-  (state.colorsDisabled ? term : term.bold)('File changed externally');
-  term.moveTo(1, 3);
-  term(`Detected external edits to: ${filePath}`);
-  term.moveTo(1, 5);
-  term('Reload from disk before writing? (y/n)');
-  return await new Promise<boolean>((resolve) => {
-    term.once('key', (name: string) => {
-      const lower = name.toLowerCase();
-      resolve(lower === 'y');
-    });
-  });
-}
-
 async function ensureFileFresh(
   term: Term,
   state: SessionState,
@@ -1358,13 +1427,9 @@ async function ensureFileFresh(
     return { ok: true, reloaded: false };
   }
 
-  const shouldReload = await confirmReload(term, state, filePath);
-  if (!shouldReload) {
-    state.message = `Canceled: ${filePath} changed on disk`;
-    return { ok: false, reloaded: false };
-  }
-
+  // Auto-reload: never write to a file that changed on disk since we last saw it.
   refreshFromDisk();
+  state.autoReload = { lastAtMs: Date.now(), files: [filePath] };
   return { ok: true, reloaded: true };
 }
 
@@ -1518,6 +1583,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     collapsedTasks: new Set<string>(),
     collapsedAreas: new Set<string>(),
     fileMtimes: getFileMtimes(options.index),
+    autoReload: null,
     filteredTasks: [],
     renderRows: [],
     filteredProjects: [],
@@ -1537,9 +1603,93 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
   let ctrlCArmedAt: number | null = null;
   let ctrlCResetTimer: ReturnType<typeof setTimeout> | null = null;
+  let cleanupAutoReloadWatch: (() => void) | null = null;
 
   function refreshFromDisk(): void {
     refreshIndex(state, options.files);
+  }
+
+  function fileHasTaskWithoutId(filePath: string): boolean {
+    try {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split('\n');
+      const projectHeadingRegex = /^(#{1,6})\s+.+\[.*project:([^\s\]]+)/;
+      const taskRegex = /^(\s*)-\s*\[([ xX])\]\s+(.+)$/;
+
+      let inProject = false;
+      for (const line of lines) {
+        const projectMatch = line.match(projectHeadingRegex);
+        if (projectMatch?.[2]) {
+          inProject = true;
+          continue;
+        }
+        if (!inProject) continue;
+
+        const taskMatch = line.match(taskRegex);
+        if (!taskMatch?.[3]) continue;
+        const { metadata } = parseMetadataBlock(taskMatch[3]);
+        if (!metadata.id) return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  function startAutoReloadWatch(): () => void {
+    const files = [...new Set(options.files)];
+    const changed = new Set<string>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleReload = (): void => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        if (changed.size === 0) return;
+
+        const filesChanged = [...changed.values()];
+        changed.clear();
+
+        const autoEnrichOnReload = options.config.interactive?.autoEnrichOnReload !== false;
+        if (autoEnrichOnReload) {
+          const needsEnrich = filesChanged.filter(fileHasTaskWithoutId);
+          if (needsEnrich.length > 0) {
+            try {
+              enrichFiles(needsEnrich, { keepShorthands: false, dryRun: false });
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              state.message = `Auto-enrich failed: ${msg}`;
+            }
+          }
+        }
+
+        refreshFromDisk();
+        state.autoReload = { lastAtMs: Date.now(), files: filesChanged };
+        render(state, term);
+      }, 75);
+    };
+
+    for (const file of files) {
+      fs.watchFile(file, { interval: 250 }, (curr, prev) => {
+        if (curr.mtimeMs === prev.mtimeMs) return;
+
+        // If we already rebuilt state with this mtime, don't spam reloads.
+        const known = state.fileMtimes.get(file);
+        if (known !== undefined && curr.mtimeMs === known) return;
+
+        changed.add(file);
+        scheduleReload();
+      });
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      changed.clear();
+      for (const file of files) {
+        fs.unwatchFile(file);
+      }
+    };
   }
 
   function setViewByKey(key: string): void {
@@ -1723,6 +1873,31 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     state.selection.selectedId = taskId;
   }
 
+  async function setBucketQuick(bucket: 'today' | 'upcoming' | 'anytime' | 'someday'): Promise<void> {
+    const selected = getSelectedTask(state);
+    if (!selected) return;
+    const taskId = selected.globalId;
+
+    const res = await ensureFileFresh(term, state, selected.filePath, refreshFromDisk);
+    if (!res.ok) return;
+
+    const task = state.index.tasks[taskId];
+    if (!task) return;
+
+    const isTogglingOff = task.bucket === bucket;
+    const changes: Record<string, string | null> = { bucket: isTogglingOff ? null : bucket };
+
+    // Keep the existing "Today implies plan=today when missing" behavior from the bucket picker.
+    // Only applies when toggling on.
+    if (!isTogglingOff && bucket === 'today' && !task.plan) {
+      changes.plan = todayIso();
+    }
+
+    updateTaskMetadataInFile(task, changes);
+    refreshFromDisk();
+    state.selection.selectedId = taskId;
+  }
+
   async function toggleNowBucket(): Promise<void> {
     const selected = getSelectedTask(state);
     if (!selected) return;
@@ -1734,8 +1909,11 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const task = state.index.tasks[taskId];
     if (!task) return;
 
-    const changes: Record<string, string | null> = {};
-    changes.bucket = task.bucket === 'now' ? null : 'now';
+    const changes = getNowToggleChanges({
+      bucket: task.bucket,
+      plan: task.plan,
+      todayIso: todayIso(),
+    });
 
     updateTaskMetadataInFile(task, changes);
     refreshFromDisk();
@@ -1806,11 +1984,18 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const task = state.index.tasks[taskId];
     if (!task) return;
 
+    const selectedRow = state.renderRows[state.selection.row];
+    const sectionName =
+      selectedRow?.kind === 'task' && selectedRow.sectionId ? state.index.sections[selectedRow.sectionId]?.name : null;
+    const proj = state.index.projects[task.projectId];
+    const projectLabel = proj?.name ? `${proj.id} — ${proj.name}` : task.projectId;
+    const contextLine = `Project: ${projectLabel}${sectionName ? `  |  Header: ${sectionName}` : ''}`;
+
     const currentMeta = readCurrentMetadataBlockString(task);
     const result = await promptEditTaskModal({
       term,
       title: `Edit task — ${task.globalId}`,
-      taskLine: `Task: ${task.text}`,
+      contextLine,
       initialText: task.text,
       initialMetadata: currentMeta,
       allTasks: Object.values(state.index.tasks),
@@ -1840,12 +2025,28 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    const initialProjectId = decision.projectId ?? null;
+    const selectedRow = state.renderRows[state.selection.row];
+    const defaultProjectId = decision.projectId ?? null;
+    const defaultSectionId =
+      selectedRow?.kind === 'task' || selectedRow?.kind === 'section' ? selectedRow.sectionId ?? null : null;
+    const insertAfterTaskId = selectedRow?.kind === 'task' ? selectedRow.task.globalId : null;
+
+    const initialProjectId =
+      selectedRow?.kind === 'task'
+        ? selectedRow.task.projectId
+        : selectedRow?.kind === 'section'
+          ? selectedRow.projectId
+          : selectedRow?.kind === 'header'
+            ? selectedRow.projectId
+            : defaultProjectId;
+
     const picked = await promptAddTaskModal({
       term,
       title: 'Add task',
       projects: projects.map((p) => ({ id: p.id, name: p.name, area: p.area })),
       initialProjectId,
+      sections: Object.values(state.index.sections),
+      initialSectionId: defaultSectionId,
       allTasks: Object.values(state.index.tasks),
       colorsDisabled: state.colorsDisabled,
     });
@@ -1907,8 +2108,16 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
+    const useCursorPlacement =
+      insertAfterTaskId && picked.projectId === initialProjectId && picked.sectionId === defaultSectionId;
+
     const existingIds = getExistingIdsForProject(state.index.tasks, targetProject);
-    const newId = generateNextId(existingIds);
+    const cursorTask = insertAfterTaskId ? state.index.tasks[insertAfterTaskId] : null;
+    const cursorParentLocalId =
+      useCursorPlacement && cursorTask?.indentLevel && cursorTask.indentLevel > 0 && cursorTask.parentId
+        ? cursorTask.parentId.split(':')[1] ?? undefined
+        : undefined;
+    const newId = generateNextId(existingIds, cursorParentLocalId);
     const created = todayIso();
 
     const metadata: TaskMetadata = {
@@ -1924,7 +2133,11 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       tags: tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
     };
 
-    const insertResult = insertTask(state.index, targetProject, picked.text.trim(), metadata);
+    const insertResult = useCursorPlacement
+      ? insertTaskAfterTaskSameLevel(state.index, insertAfterTaskId, picked.text.trim(), metadata)
+      : picked.sectionId
+        ? insertTaskUnderSection(state.index, picked.sectionId, picked.text.trim(), metadata)
+        : insertTask(state.index, targetProject, picked.text.trim(), metadata);
     if (!insertResult.success) {
       state.message = insertResult.error ?? 'Failed to insert task';
       return;
@@ -2172,12 +2385,6 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    // Allow quitting even if a flow is mid-flight (e.g. a stuck prompt).
-    if (name === 'q') {
-      resolveExit?.();
-      return;
-    }
-
     if (state.busy) return;
     state.message = null;
 
@@ -2244,15 +2451,6 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         return;
       }
 
-      if (name === 'z') {
-        state.statusMode = state.statusMode === 'open' ? 'all' : 'open';
-        state.query = normalizeStatusInQuery(state.query, state.statusMode);
-        state.search.input = createTextInput(normalizeStatusInQuery(state.search.input.value, state.statusMode));
-        updateAutocomplete(state);
-        recompute(state);
-        render(state, term);
-        return;
-      }
       if (name === 'ENTER') {
         state.query = normalizeStatusInQuery(state.search.input.value.trim(), state.statusMode);
         state.search.active = false;
@@ -2270,7 +2468,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         render(state, term);
         return;
       }
-      if (name === 'CTRL_SLASH' || name === '!') {
+      if (name === 'CTRL_SLASH') {
         if (state.search.scope === 'view') {
           // switch to global: strip base query if present
           const base = getEffectiveQuery(state);
@@ -2340,12 +2538,6 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       return;
     }
 
-    // Global quit
-    if (name === 'q') {
-      resolveExit?.();
-      return;
-    }
-
     // Projects list filter mode (activated via "/")
     if (isProjectsList && state.projectsList.active) {
       if (name === 'ENTER') {
@@ -2376,6 +2568,20 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         render(state, term);
         return;
       }
+      return;
+    }
+
+    // Global quit (disabled while any text input is active)
+    if (
+      name === 'q' &&
+      shouldAllowGlobalQuit({
+        busy: state.busy,
+        searchActive: state.search.active,
+        commandActive: state.command.active,
+        projectsFilterActive: isProjectsList && state.projectsList.active,
+      })
+    ) {
+      resolveExit?.();
       return;
     }
 
@@ -2439,6 +2645,15 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     // Priority ordering toggle: high-first → low-first → off
     if (!isProjectsList && (name === 'o' || name === 'O')) {
       state.priorityOrder = cyclePriorityOrderMode(state.priorityOrder);
+      recompute(state);
+      render(state, term);
+      return;
+    }
+
+    // Toggle "focus bucket" within the current view (via query rewrite).
+    if (!isProjectsList && (name === 'T' || name === 'U' || name === 'Y' || name === 'S')) {
+      const bucket = name === 'T' ? 'today' : name === 'U' ? 'upcoming' : name === 'Y' ? 'anytime' : 'someday';
+      state.query = toggleBucketFocusInQuery(state.query, bucket);
       recompute(state);
       render(state, term);
       return;
@@ -2722,8 +2937,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
 
     // Task list: Fold/unfold everything.
-    // Use `F` (Shift+f) so it pairs with `Enter` (fold one row) and works reliably in most terminals.
-    if (!isProjectsList && name === 'F') {
+    if (!isProjectsList && name === 'f') {
       const areaKeys = new Set<string>();
       const projectIds = new Set<string>();
       const sectionIds = new Set<string>();
@@ -2906,11 +3120,59 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         }
         return;
       }
-      if (name === 't') {
+      if (name === 'P') {
         state.busy = true;
         render(state, term);
         try {
           await setPlanOrDue('plan');
+        } finally {
+          state.busy = false;
+          recompute(state);
+          render(state, term);
+        }
+        return;
+      }
+      if (name === 't' || name === '!') {
+        state.busy = true;
+        render(state, term);
+        try {
+          await setBucketQuick('today');
+        } finally {
+          state.busy = false;
+          recompute(state);
+          render(state, term);
+        }
+        return;
+      }
+      if (name === 'u' || name === '>') {
+        state.busy = true;
+        render(state, term);
+        try {
+          await setBucketQuick('upcoming');
+        } finally {
+          state.busy = false;
+          recompute(state);
+          render(state, term);
+        }
+        return;
+      }
+      if (name === 'y' || name === '~') {
+        state.busy = true;
+        render(state, term);
+        try {
+          await setBucketQuick('anytime');
+        } finally {
+          state.busy = false;
+          recompute(state);
+          render(state, term);
+        }
+        return;
+      }
+      if (name === 's') {
+        state.busy = true;
+        render(state, term);
+        try {
+          await setBucketQuick('someday');
         } finally {
           state.busy = false;
           recompute(state);
@@ -2987,12 +3249,15 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   term.on('key', onKey);
 
   try {
+    cleanupAutoReloadWatch = startAutoReloadWatch();
     render(state, term);
     await exitPromise;
   } finally {
     if (ctrlCResetTimer) clearTimeout(ctrlCResetTimer);
     ctrlCResetTimer = null;
     ctrlCArmedAt = null;
+    if (cleanupAutoReloadWatch) cleanupAutoReloadWatch();
+    cleanupAutoReloadWatch = null;
 
     term.removeListener('key', onKey);
     process.stdout.removeListener('resize', onResize);

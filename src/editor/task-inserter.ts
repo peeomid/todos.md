@@ -156,6 +156,104 @@ function findEndOfTaskBlock(lines: string[], taskLineNumber: number): number {
   return lastLine;
 }
 
+export function insertTaskAfterTaskSameLevel(
+  index: TaskIndex,
+  taskGlobalId: string,
+  text: string,
+  metadata: TaskMetadata
+): InsertResult {
+  const task = index.tasks[taskGlobalId];
+  if (!task) {
+    return { success: false, error: `Task '${taskGlobalId}' not found.` };
+  }
+
+  const project = index.projects[task.projectId];
+  if (!project) {
+    return { success: false, error: `Project '${task.projectId}' not found.` };
+  }
+
+  const filePath = project.filePath;
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: `File not found: ${filePath}` };
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+
+  const afterLine = findEndOfTaskBlock(lines, task.lineNumber);
+  const indentLevel = task.indentLevel;
+  const taskLine = buildTaskLine(text, metadata, indentLevel);
+  return insertTaskLine(filePath, afterLine, taskLine);
+}
+
+export function insertTaskUnderSection(index: TaskIndex, sectionId: string, text: string, metadata: TaskMetadata): InsertResult {
+  const section = index.sections[sectionId];
+  if (!section) {
+    return { success: false, error: `Section '${sectionId}' not found.` };
+  }
+
+  const project = index.projects[section.projectId];
+  if (!project) {
+    return { success: false, error: `Project '${section.projectId}' not found.` };
+  }
+
+  const filePath = project.filePath;
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: `File not found: ${filePath}` };
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+
+  const sectionsInProjectFile = Object.values(index.sections)
+    .filter((s) => s.projectId === section.projectId && s.filePath === section.filePath)
+    .sort((a, b) => a.lineNumber - b.lineNumber);
+
+  const directChildLines = sectionsInProjectFile
+    .filter((s) => s.parentId === sectionId)
+    .map((s) => s.lineNumber)
+    .sort((a, b) => a - b);
+
+  let afterLine: number;
+
+  // If this section has child headings, insert before the first child so the new task remains under this header.
+  if (directChildLines.length > 0) {
+    afterLine = Math.max(section.lineNumber, directChildLines[0]! - 1);
+  } else {
+    let boundaryLine = lines.length;
+
+    // Bound by next project heading in the same file (project context ends).
+    const projectsInFile = Object.values(index.projects)
+      .filter((p) => p.filePath === filePath)
+      .sort((a, b) => a.lineNumber - b.lineNumber);
+    const nextProject = projectsInFile.find((p) => p.lineNumber > project.lineNumber);
+    if (nextProject) boundaryLine = Math.min(boundaryLine, nextProject.lineNumber - 1);
+
+    // Bound by next section heading at the same or higher level (sibling/ancestor).
+    for (const s of sectionsInProjectFile) {
+      if (s.lineNumber <= section.lineNumber) continue;
+      if (s.headingLevel <= section.headingLevel) {
+        boundaryLine = Math.min(boundaryLine, s.lineNumber - 1);
+        break; // sectionsInProjectFile sorted by line
+      }
+    }
+
+    // Find the last top-level task within this section range.
+    const candidates = Object.values(index.tasks)
+      .filter((t) => t.projectId === section.projectId)
+      .filter((t) => t.filePath === filePath)
+      .filter((t) => t.indentLevel === 0)
+      .filter((t) => t.lineNumber > section.lineNumber && t.lineNumber <= boundaryLine)
+      .sort((a, b) => a.lineNumber - b.lineNumber);
+
+    const last = candidates[candidates.length - 1];
+    afterLine = last ? findEndOfTaskBlock(lines, last.lineNumber) : section.lineNumber;
+  }
+
+  const taskLine = buildTaskLine(text, metadata, 0);
+  return insertTaskLine(filePath, afterLine, taskLine);
+}
+
 /**
  * Get the indentation level of a line (number of leading spaces / 2).
  */

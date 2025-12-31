@@ -4,6 +4,20 @@ Track specification changes that affect implementation.
 
 ---
 
+## 2025-12-31: Force Global Config Flag
+
+### Overview
+Added a global CLI flag to force using the global config file even when a project config exists.
+
+### New Flag
+- `--global-config` / `-G`: force `~/.config/todosmd/config.json` as the active config source
+
+### Files Updated
+- `cli-architecture.md` - config resolution order + global flag table
+- `cli-commands.md` - global flags table
+
+---
+
 ## 2025-12-10: Multi-Level Project Hierarchies (Clarification)
 
 ### New Sections in todo-format-spec.md
@@ -204,7 +218,7 @@ Default sort within bucket views:
 
 ### Overview
 - Added `o` to toggle priority ordering: high-first → low-first → off.
-- Added `f` to fold/unfold the selected row, and `F` to fold/unfold everything (reliable across terminals).
+- Added `Enter` to fold/unfold the selected row, and `F` to fold/unfold everything (reliable across terminals).
 - Header “Flags” line now surfaces the current priority ordering mode alongside hide/show done.
 - Projects view: changed default “type to filter” to an explicit `/`-activated filter mode to avoid collisions with `0–9` view switching.
 
@@ -365,3 +379,68 @@ Default sort within bucket views:
 - `commands/14-block-template.md`
 - `src/tui/interactive.ts`
 - `src/enricher/shorthand-parser.ts`
+
+---
+
+## 2025-12-23: TUI Fold/Unfold-All Rekeyed to `f`
+
+### Overview
+- Changed fold/unfold-all from `F` to `f`.
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui.md`
+- `src/tui/interactive.ts`
+- `src/tui/shorthand-help.ts`
+
+---
+
+## 2025-12-23: TUI Text Inputs Don’t Trigger Global Shortcuts
+
+### Overview
+- Fixed global shortcuts (e.g. `q`) triggering while typing in text inputs (search, go-to-line, project filter).
+- Search scope toggle is now `Ctrl+/` only (removed `!` alias) so `!` behaves like normal text input.
+
+### Files Updated
+- `tui.md`
+- `tui_specs.md`
+- `tui-architecture.md`
+- `tui_implementation_details.md`
+- `src/tui/interactive.ts`
+- `src/tui/shorthand-help.ts`
+
+---
+
+## 2025-12-23: TUI `n` Toggles Now↔Today
+
+### Overview
+- `n` no longer clears `bucket:now`; pressing `n` on a `bucket:now` task moves it to `bucket:today` instead (and sets `plan:<today>` if missing).
+
+### Files Updated
+- `tui_specs.md`
+- `tui_implementation_details.md`
+- `tui.md`
+- `src/tui/interactive.ts`
+- `src/tui/shorthand-help.ts`
+
+---
+
+## 2025-12-27: OR Query Filters + Parentheses Grouping
+
+### Overview
+- Query syntax now supports boolean OR with `|` or `OR` and parentheses grouping.
+- AND remains whitespace-based; grouping works across CLI, sync blocks, and TUI queries.
+
+### Files Updated
+- `commands/02-list.md`
+- `commands/09-sync.md`
+- `commands/12-search.md`
+- `cli-architecture.md`
+- `cli/help-topics.ts`
+- `src/query/filters.ts`
+- `src/cli/list-command.ts`
+- `src/cli/search-command.ts`
+- `src/cli/sync-command.ts`
+- `src/cli/stats-command.ts`
+- `src/tui/interactive.ts`

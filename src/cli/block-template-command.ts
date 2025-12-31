@@ -2,7 +2,7 @@
  * tmd block-template - Generate sync block skeletons for copy-paste
  */
 
-import { extractFlags } from './flag-utils.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 
 interface BlockTemplateOptions {
@@ -28,6 +28,7 @@ export function handleBlockTemplateCommand(args: string[]): void {
 }
 
 function parseBlockTemplateFlags(args: string[]): BlockTemplateOptions {
+  extractBooleanFlags(args, ['--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--name']);
 
   // First positional argument is preset name or custom query

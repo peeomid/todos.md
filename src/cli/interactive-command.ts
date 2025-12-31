@@ -6,8 +6,8 @@ import fs from 'node:fs';
 import { enrichFiles } from '../enricher/index.js';
 import { buildIndex } from '../indexer/index.js';
 import { writeIndexFile, readIndexFile } from '../indexer/index-file.js';
-import { loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractFlags, extractMultipleFlags } from './flag-utils.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { CliUsageError, FileNotFoundError } from './errors.js';
 import { runInteractiveTui } from '../tui/interactive.js';
 import { handleSyncCommand } from './sync-command.js';
@@ -47,10 +47,14 @@ Options:
 }
 
 function parseInteractiveFlags(args: string[]): InteractiveOptions {
+  const boolFlags = extractBooleanFlags(args, ['--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c', '--output', '--out', '-o']);
   const fileFlags = extractMultipleFlags(args, ['--file', '--input', '-f']);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'] ?? null;
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['--out'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);

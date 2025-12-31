@@ -8,14 +8,20 @@
 import fs from 'node:fs';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
-import { loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
 import { greenText, dimText, cyanText } from './terminal.js';
 import { markTaskDone } from '../editor/task-editor.js';
 import { findTmdBlocks, replaceBlockContent, parseTasksInBlock, type TmdBlock } from '../sync/tmd-block.js';
 import { renderTasksAsMarkdown } from '../sync/task-renderer.js';
-import { parseFilterArgs, buildFiltersFromOptions, composeFilters, sortTasks } from './list-filters.js';
+import {
+  parseQueryToFilterGroups,
+  buildFilterGroups,
+  composeFilterGroups,
+  applyDefaultStatusToGroups,
+  sortTasks,
+} from './list-filters.js';
 import type { Task, TaskIndex } from '../schema/index.js';
 
 interface SyncOptions {
@@ -62,7 +68,14 @@ export function handleSyncCommand(args: string[]): void {
 }
 
 function parseSyncFlags(args: string[]): SyncOptions {
-  const boolFlags = extractBooleanFlags(args, ['--push-only', '--pull-only', '--dry-run', '--json']);
+  const boolFlags = extractBooleanFlags(args, [
+    '--push-only',
+    '--pull-only',
+    '--dry-run',
+    '--json',
+    '--global-config',
+    '-G',
+  ]);
 
   const valueFlags = extractFlags(args, [
     '--config',
@@ -74,7 +87,10 @@ function parseSyncFlags(args: string[]): SyncOptions {
   // Extract multiple --file/-f flags
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, []);
@@ -294,17 +310,19 @@ function regenerateViewBlocks(
     const block = blocks[i]!;
 
     // Parse query and build filters
-    const filterArgs = block.query.split(/\s+/);
-    const filterOptions = parseFilterArgs(filterArgs);
-
-    // Default status to 'open' if not specified
-    if (!filterOptions.status) {
-      filterOptions.status = 'open';
+    let filterGroups: string[][];
+    try {
+      filterGroups = parseQueryToFilterGroups(block.query);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid query syntax.';
+      throw new CliUsageError(`Invalid query in block "${block.query}": ${message}`);
     }
 
+    filterGroups = applyDefaultStatusToGroups(filterGroups, 'open');
+
     // Build and apply filters
-    const filters = buildFiltersFromOptions(filterOptions);
-    const composedFilter = composeFilters(filters);
+    const groupFilters = buildFilterGroups(filterGroups);
+    const composedFilter = composeFilterGroups(groupFilters);
     let tasks = Object.values(index.tasks).filter(composedFilter);
 
     // Sort by bucket, then plan/due, then priority, then id

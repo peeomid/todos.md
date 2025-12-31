@@ -17,6 +17,7 @@
 - Added parseRelativeDate to date-utils.ts for --plan today/tomorrow support
 - Spec change: sync markers now use `<!-- tmd:start query="..." -->` / `<!-- tmd:end -->` (HTML comments, hidden in rendered MD)
 - Spec change: filter syntax unified to key:value (e.g., `status:open bucket:today`) for both CLI and sync blocks
+- Added OR query support with `|`/`OR` and parentheses grouping across CLI/TUI/sync/stats
 - Added command specs: `tmd search` (text: filter wrapper), `tmd stats` (metrics), `tmd block-template` (sync block generator)
 - Added Priority field to schema (high, normal, low) with (A)/(B)/(C) shorthand parsing in enrich command
 - Updated `tmd list` to use key:value filter syntax with new filters: priority:, bucket:, plan:, text:
@@ -56,6 +57,6 @@
 - TUI: task list upgrades — row numbers, `:` go-to-line, and fold/unfold area/project headers and task subtrees with Enter (2025-12-22)
 - TUI: Projects view is type-to-filter by default (arrow-only navigation); add project is `Ctrl+N` (2025-12-22)
 - TUI: help overlay readability upgrades — colored section headers and vim/arrow scrolling (2025-12-22)
-- TUI: folding shortcuts — `f` folds selected row, `F` folds/unfolds all; `o` toggles priority ordering (high-first/low-first/off) with header flags indicator (2025-12-22)
+- TUI: folding shortcuts — `Enter` folds selected row, `f` folds/unfolds all; `o` toggles priority ordering (high-first/low-first/off) with header flags indicator (2025-12-22)
 - TUI: fixed priority ordering toggle in non-drilldown views (2025-12-22)
 - TUI: Projects list filtering moved behind `/` to avoid accidental `0–9` view switching (2025-12-22)

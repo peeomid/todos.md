@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { enrichFiles, type EnrichFileResult, type EnrichResult } from '../enricher/index.js';
-import { loadConfig, resolveFiles } from '../config/loader.js';
+import { getGlobalConfigPath, loadConfig, resolveFiles } from '../config/loader.js';
 import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
 import { boldText, dimText, cyanText, greenText } from './terminal.js';
 import { FileNotFoundError } from './errors.js';
@@ -18,12 +18,21 @@ export function handleEnrichCommand(args: string[]): void {
 }
 
 function parseEnrichFlags(args: string[]): EnrichOptions {
-  const boolFlags = extractBooleanFlags(args, ['--keep-shorthands', '--dry-run', '--json']);
+  const boolFlags = extractBooleanFlags(args, [
+    '--keep-shorthands',
+    '--dry-run',
+    '--json',
+    '--global-config',
+    '-G',
+  ]);
   const valueFlags = extractFlags(args, ['--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
-  const configPath = valueFlags['--config'] ?? valueFlags['-c'];
+  const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
+  const configPath = useGlobalConfig
+    ? getGlobalConfigPath()
+    : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);

@@ -178,7 +178,7 @@ Acceptance:
 - Live search:
   - `/` enters search, prefilled with current view base query
   - updates filter on every keypress
-  - `!` or `Ctrl+/` toggles scope view/global
+  - `Ctrl+/` toggles scope view/global
   - `Esc`/`Ctrl+C` exits and restores base view
 - Header displays the effective query string (single source of truth).
 
@@ -190,8 +190,8 @@ Acceptance:
 - Implement writes to Markdown and immediate in-memory updates for:
   - `space`: toggle done (open→done cascades; undone doesn’t cascade)
   - `p`: priority popup (h/n/l/c)
-  - `b`: bucket popup (t/u/a/s/c), with “if bucket=today and plan empty, set plan=today”
-  - `n`: plan popup (today/manual/clear)
+  - `b`: bucket popup (n/t/u/a/s/c), with “if bucket=today and plan empty, set plan=today”
+  - `P`: plan popup (today/manual/clear)
   - `d`: due popup (today/manual/clear)
 - Extend date parsing to support manual shortcuts:
   - `YYYY-MM-DD`

@@ -127,10 +127,12 @@ JSON format (following mcporter pattern).
 
 ### 4.2 Config Resolution Order
 
-1. CLI flags (`--file`, `--config`, `--output`)
+1. CLI flags (`--global-config`/`-G`, `--file`, `--config`, `--output`)
 2. Project config (`.todosmd.json` in current dir, or walk up to find)
 3. Global config (`~/.config/todosmd/config.json`)
 4. Smart defaults
+
+If `--global-config` is set, project config discovery is skipped and the global config is used.
 
 ### 4.3 Config Schema
 
@@ -207,6 +209,7 @@ When no config is found and no `--file` flags:
 |------|-------|-------------|
 | `--file <path>` | `-f` | Input file (repeatable for multiple files) |
 | `--config <path>` | `-c` | Path to config file |
+| `--global-config` | `-G` | Force using the global config file |
 | `--project <name>` | `-p` | Use named project from global config |
 | `--output <path>` | `-o` | Override output file path |
 | `--json` | | Output JSON format |
@@ -355,10 +358,12 @@ Uses HTML comments (hidden in rendered Markdown):
 
 The `query` attribute uses the same `key:value` syntax as `tmd list` filters:
 - `status:open bucket:today` - Open tasks in today bucket
+- `bucket:!today` - Exclude tasks in today bucket (negation via `!` prefix inside `bucket:`)
 - `energy:low` - Low energy tasks
 - `project:inbox` - Tasks from inbox project
 - `overdue:true` - Overdue tasks
 - `due:this-week area:work` - Due this week in work area
+- `bucket:today | plan:today` - OR via `|` or `OR` (parentheses supported)
 
 Both CLI and embedded queries use the same filter engine.
 

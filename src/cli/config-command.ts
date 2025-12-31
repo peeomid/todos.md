@@ -14,6 +14,7 @@ import { CliUsageError } from './errors.js';
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export function handleConfigCommand(args: string[]): void {
+  extractBooleanFlags(args, ['--global-config', '-G']);
   if (args.length === 0) {
     throw new CliUsageError('Usage: tmd config <init|get|set|list|path> [args]');
   }

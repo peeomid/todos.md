@@ -61,7 +61,7 @@ Filtering pipeline (in `recompute()`):
    - **Structured** tokens: `key:value` (recognized by `parseFilterArg`)
    - **Free-text** tokens: anything else (each treated as `text:<token>`)
 5. Build predicate filters and apply them to `index.tasks`.
-6. Sort tasks by view sort spec (or default sort).
+6. Sort tasks by view sort spec (or default sort). In project-grouped task lists, sorting is tree-preserving (subtasks stay under their parent; subtrees sort as a unit).
 7. Render:
    - optionally grouped by project with visual header rows
    - headers are not selectable; selection is always on a task row
@@ -73,7 +73,9 @@ Filtering pipeline (in `recompute()`):
 Before any write to a Markdown file:
 
 - The TUI checks the file `mtime` against `fileMtimes`.
-- If it changed, the user is prompted to reload from disk before proceeding.
+- If it changed, the TUI forces an automatic reload from disk before proceeding (no prompt).
+
+In addition, the TUI watches input files for changes and auto-reloads when it detects external edits.
 
 Edits are “locate then mutate”:
 
@@ -110,7 +112,7 @@ Search:
 - `/` enter search (prefilled with current query + trailing space)
 - `Enter` apply search to `query` and return to list
 - `Esc`/`Ctrl+C` cancel
-- `!`/`Ctrl+/` toggle view vs global scope
+- `Ctrl+/` toggles view vs global scope
 - `?` show shorthand help overlay
 
 Task actions:

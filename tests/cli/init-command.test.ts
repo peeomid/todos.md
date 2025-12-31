@@ -30,7 +30,12 @@ describe('tmd init command', () => {
 
   it('does not overwrite existing files without --force', () => {
     fs.writeFileSync(path.join(tempDir, 'todos.md'), '# Existing\n', 'utf-8');
-    expect(() => handleInitCommand([])).toThrow(CliUsageError);
+    expect(() => handleInitCommand([])).not.toThrow();
+
+    // Keeps the existing todos.md but still scaffolds config + view.
+    expect(fs.readFileSync(path.join(tempDir, 'todos.md'), 'utf-8')).toBe('# Existing\n');
+    expect(fs.existsSync(path.join(tempDir, '.todosmd.json'))).toBe(true);
+    expect(fs.existsSync(path.join(tempDir, 'views', 'daily.md'))).toBe(true);
   });
 
   it('supports --dry-run without writing files', () => {
@@ -48,5 +53,10 @@ describe('tmd init command', () => {
 
     const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as { version: number };
     expect(index.version).toBe(3);
+  });
+
+  it('throws if the config file exists (unless --force)', () => {
+    fs.writeFileSync(path.join(tempDir, '.todosmd.json'), '{"files":["todos.md"],"output":"todos.json"}\n', 'utf-8');
+    expect(() => handleInitCommand([])).toThrow(CliUsageError);
   });
 });

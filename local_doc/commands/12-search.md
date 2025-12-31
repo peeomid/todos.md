@@ -25,7 +25,7 @@ tmd search <text> [filters...] [options]
 
 ## Filters
 
-Same `key:value` filters as `tmd list`:
+Same `key:value` filters as `tmd list` (supports `|` / `OR` with parentheses for grouping):
 - `project:`, `area:`, `energy:`, `status:`, `bucket:`, `plan:`, `due:`, `tags:`, `overdue:true`, etc.
 
 ## Options
@@ -51,6 +51,9 @@ tmd search "invoice" status:done
 
 # Search with date filter
 tmd search "google ads" plan:last-7d area:work
+
+# OR filters with grouping
+tmd search "bank" "(bucket:today | plan:today) priority:high"
 
 # JSON output
 tmd search "onboarding" --json
@@ -82,6 +85,7 @@ Same as `tmd list`, showing matching tasks with file location.
 {
   "query": "welcome email",
   "filters": { "project": "as-onb" },
+  "filterGroups": [["project:as-onb", "status:open"]],
   "tasks": [...],
   "count": 2
 }
@@ -92,7 +96,7 @@ Same as `tmd list`, showing matching tasks with file location.
 ## Behavior
 
 1. Parse search text and filters
-2. Internally calls `tmd list text:"<search>" ...filters...`
+2. Applies the same filter engine as `tmd list` (OR/grouping included)
 3. `text:` filter matches against:
    - Task text (case-insensitive substring)
    - Project name

@@ -37,6 +37,9 @@ Options:
   --force                Overwrite existing targets
   --dry-run              Show actions without writing files
   -h, --help             Show help
+
+Notes:
+  - If the primary todo file already exists, init will keep it (unless --force).
 `);
 }
 
@@ -72,9 +75,9 @@ function runInit(options: InitOptions): void {
 
   const viewPath = path.join('views', 'daily.md');
 
-  const plannedWrites: Array<{ path: string; contents: string }> = [];
+  const plannedWrites: Array<{ path: string; contents: string; allowExisting?: boolean }> = [];
 
-  plannedWrites.push({ path: file, contents: renderTodosScaffold() });
+  plannedWrites.push({ path: file, contents: renderTodosScaffold(), allowExisting: true });
   plannedWrites.push({ path: viewPath, contents: renderDailyViewScaffold() });
 
   if (createConfig) {
@@ -109,20 +112,24 @@ function runInit(options: InitOptions): void {
     plannedWrites.push({ path: globalPath, contents: JSON.stringify(globalConfigData, null, 2) + '\n' });
   }
 
-  // Validate overwrite rules (dry-run warns instead of throwing)
-  for (const write of plannedWrites) {
-    if (!force && fs.existsSync(write.path)) {
-      const message = `File already exists: ${write.path}. Use --force to overwrite.`;
-      if (dryRun) {
-        console.log(`(dry-run) ${message}`);
-        continue;
-      }
-      throw new CliUsageError(message);
+  const writesToApply = plannedWrites.filter((write) => {
+    if (force) return true;
+    if (!fs.existsSync(write.path)) return true;
+    if (write.allowExisting) {
+      if (dryRun) console.log(`(dry-run) Would keep existing file: ${write.path}`);
+      else console.log(`Keeping existing file: ${write.path}`);
+      return false;
     }
-  }
+    const message = `File already exists: ${write.path}. Use --force to overwrite.`;
+    if (dryRun) {
+      console.log(`(dry-run) ${message}`);
+      return false;
+    }
+    throw new CliUsageError(message);
+  });
 
   // Ensure directories exist
-  for (const write of plannedWrites) {
+  for (const write of writesToApply) {
     const dir = path.dirname(write.path);
     if (dir !== '.' && !fs.existsSync(dir)) {
       if (dryRun) {
@@ -134,7 +141,7 @@ function runInit(options: InitOptions): void {
   }
 
   // Write files
-  for (const write of plannedWrites) {
+  for (const write of writesToApply) {
     if (dryRun) {
       console.log(`(dry-run) Would write: ${write.path}`);
       continue;

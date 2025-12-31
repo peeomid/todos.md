@@ -19,7 +19,7 @@ tmd list [filters...] [options]
 
 ## Filter Syntax
 
-Filters use a unified `key:value` syntax. Multiple filters are combined with AND logic.
+Filters use a unified `key:value` syntax. Spaces are AND. Use `|` or `OR` for OR, with parentheses for grouping.
 
 | Filter | Description | Example |
 |--------|-------------|---------|
@@ -35,6 +35,10 @@ Filters use a unified `key:value` syntax. Multiple filters are combined with AND
 | `plan:<date>` | Filter by plan date | `plan:today` |
 | `parent:<id>` | Show children of a task | `parent:as-onb:1` |
 | `top-level:true` | Show only top-level tasks | `top-level:true` |
+
+Boolean logic:
+- Space = AND
+- `|` or `OR` = OR (use parentheses to group)
 
 ## Display Options
 
@@ -80,6 +84,9 @@ tmd list status:done
 
 # Combine filters (AND logic)
 tmd list project:inbox energy:low status:open
+
+# OR with grouping
+tmd list "(bucket:today | plan:today) priority:high"
 
 # Multiple filters for daily planning view
 tmd list status:open bucket:today
@@ -186,7 +193,9 @@ inbox:1     Call bank about card [energy:low est:15m]
   },
   "filters": {
     "status": "open"
-  }
+  },
+  "filterGroups": [["status:open"]],
+  "query": "status:open"
 }
 ```
 
@@ -296,7 +305,7 @@ src/cli/
    - `filterByBucket(tasks, bucket)`
    - `filterByPlan(tasks, dateSpec)`
    - `filterOverdue(tasks)`
-   - Compose filters with AND logic
+   - Compose filters with AND logic inside groups, OR between groups
    - Same filter engine used by `tmd list` CLI and `tmd sync` embedded queries
 
 3. **Date utilities** (`date-utils.ts`)

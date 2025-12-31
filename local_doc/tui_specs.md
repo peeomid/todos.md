@@ -61,7 +61,7 @@ It should let you:
 Rough layout:
 
 ```text
-┌────────────────────────── tmd – Today (bucket:today) ──────────────────────────┐
+┌────────────────────────── tmd – Today (bucket:today | plan:today | due:today) ──────────────────────────┐
 [0] All [1] Now [2] Today [3] Upcoming [4] Anytime [5] Someday [6] Projects [/] Search 
 ├────────────────────────────── Task List ─────────────────────────────────────┤
 │ as-onb — Autosenso Onboarding (2 tasks)                                      │
@@ -70,15 +70,15 @@ Rough layout:
 │ life — Life Admin (1 task)                                                   │
 │ [x] (B) ~  Call bank about card          life:2     plan:2025-12-18   15m    │
 │                                                                              │
-│ View: Today (2)  |  Query: status:open bucket:today  |  Flags: hide-done, pri:high-first │
+│ View: Today (2)  |  Query: status:open (bucket:today | plan:today | due:today)  |  Flags: hide-done, pri:high-first │
 ├──────────────────────────── Details / Help ──────────────────────────────────┤
 │ Draft welcome email                                                         │
 │ project: as-onb   area: sidebiz   bucket: today   priority: high            │
 │ energy: normal   plan: 2025-12-18   due: -   est: 60m                       │
 │ file: projects/autosenso.md:23                                              │
 │──────────────────────────────────────────────────────────────────────────────│
-│ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [n] now  [/] search   │
-│ [t] plan  [d] due  [a] add  [h/←] collapse  [l/→] expand  [0–9] views  [q] quit     │
+│ [j/k/↑/↓] move  [space] toggle done  [p] priority  [b] bucket  [n] now↔today  [/] search   │
+│ [P] plan  [d] due  [a] add  [t/!] today  [u/>] upcoming  [y/~] anytime  [s] someday  [0–9] views  [q] quit     │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -165,9 +165,7 @@ Built-ins (v1):
 
  * `key: "2"`
  * `name: "Today"`
- * `base query`: `status:open bucket:today`
-
- * (optional extension later: include `plan:today` / `due:today` / overdue).
+ * `base query`: `status:open (bucket:today | plan:today | due:today)`
 * **3 – Upcoming**
 
  * `key: "3"`
@@ -218,6 +216,9 @@ Rendering rule (v1):
   * `l` / `→` expands the selected header/task; if already expanded, it goes to the first child (when applicable).
   * The task list shows a leftmost row-number column (1-based), and `:` opens a go-to-line prompt to jump to a specific row.
   * Projects that are in-scope for the current view (e.g. `project:` filters) may still be shown even if they have 0 matching tasks.
+* Sorting must not break hierarchy:
+  * A subtask is always rendered under its parent (never “floats” above it due to sort).
+  * Sort keys are applied in a tree-preserving way (effectively ordering subtrees while keeping parent→children adjacency).
 
 ### 3.2. Custom views (config)
 
@@ -258,6 +259,7 @@ Help is always displayed at the bottom (below the details panel).
 * `0–9` – jump to specific view (0 = All, 1 = Today, etc.).
 * `?` – show shorthand help (priority/bucket shorthands displayed in task rows).
 * `o` – toggle priority ordering (high-first → low-first → off); current mode shows in the header flags line.
+* `T` / `U` / `Y` / `S` – toggle **focusing** `bucket:today` / `bucket:upcoming` / `bucket:anytime` / `bucket:someday` within the current view (implemented as a query rewrite: sets `bucket:<bucket>`; pressing again clears `bucket:`).
 
 ### 4.2. Task list navigation (vim style + arrows)
 
@@ -270,7 +272,7 @@ Help is always displayed at the bottom (below the details panel).
 * `:` – open “go to line” prompt; type a row number and press Enter to jump.
 * `h` / `←` – collapse current row; if already collapsed (or not foldable), go to parent.
 * `l` / `→` – expand current row; if already expanded, go to first child (when applicable).
-* `F` – fold/unfold everything.
+* `f` – fold/unfold everything.
 
 ---
 
@@ -286,6 +288,7 @@ Behavior:
 * Input is **pre-filled** with the current query for the view, plus a trailing space (so you can type immediately).
 * On every keypress, the task list is re-filtered.
 * You can edit anywhere in the search string (not just at the end).
+* While a text input is focused, printable characters are treated as text (global shortcuts like `q` do not fire).
 
 Editing inside the search bar (best-effort; depends on terminal key mapping):
 
@@ -317,7 +320,7 @@ Resulting query used:
 
 Inside search bar:
 
-* `!` or `Ctrl+/` – toggle between:
+* `Ctrl+/` – toggle between:
 
  * **View scope**: base query of view + search string.
  * **Global scope**: ignore view base query, use search string alone.
@@ -419,7 +422,7 @@ The top bar’s “Query” section shows:
 * E.g. in search:
 
  ```text
- View: Today (2) | Query: status:open bucket:today text:stripe priority:high | Flags: hide-done, pri:high-first
+ View: Today (2) | Query: status:open (bucket:today | plan:today | due:today) text:stripe priority:high | Flags: hide-done, pri:high-first
  ```
 
 ---
@@ -538,12 +541,21 @@ Effects:
 
 Behavior:
 
-* If `bucket` is `now`, clear it.
+* If `bucket` is `now`, set `bucket:today` (and if `plan` is empty, set `plan:<today>`).
 * Otherwise set `bucket:now`.
+
+### 7.3c. Quick-set buckets (single key)
+
+Keys (when a task row is selected):
+
+* `t` or `!` toggles `bucket:today` on/off (when toggling on, if `plan` empty, set `plan:<today>`).
+* `u` or `>` toggles `bucket:upcoming` on/off.
+* `y` or `~` toggles `bucket:anytime` on/off.
+* `s` toggles `bucket:someday` on/off.
 
 ### 7.4. Plan date mini menu
 
-* Key: `t`
+* Key: `P`
 
 Popup:
 
@@ -625,16 +637,23 @@ Project targeting (must be explicit to the user):
   2. If the current list contains tasks from exactly one project, add to that project.
   3. Otherwise, default to the selected task’s project.
   4. Otherwise, fall back to Inbox (`interactive.defaultProject`, default `"inbox"`).
-* The Project field is prefilled by the rules above, but the modal always starts focused on Project so it’s easy to confirm/change.
+* The Project field is prefilled by the rules above, but the modal starts focused on **Text** (Project/Header sit above it and can be changed with `Shift+Tab`).
 * When a project is selected, the Project field displays `projectId — project name`.
+* Header targeting:
+  - When the destination project has section headings (Markdown headings inside the project), the add modal offers a `Header` picker.
+  - Default header is the current cursor’s header (if the selection is inside a header group); otherwise `(no header)`.
+* Default insertion rule:
+  - If the cursor is on a task and you keep Project/Header unchanged, adding inserts **after the selected task** at the **same indentation level** (i.e. a sibling).
+  - Otherwise, adding inserts into the chosen Project/Header (project end if `(no header)`).
 
 Flow:
 
-`a` opens a 3-field add modal:
+`a` opens a 4-field add modal:
 
 1. `Project` (with typeahead suggestions)
-2. `Text`
-3. `Meta` (optional; autocomplete for common metadata keys/values)
+2. `Header` (optional; section heading within the project)
+3. `Text`
+4. `Meta` (optional; autocomplete for common metadata keys/values)
 
 Key rules:
 
@@ -702,23 +721,20 @@ Problem: user may edit `todos.md` outside `tmd interactive` while interactive is
 
 Requirement:
 
-* On interactive start, record file `mtime` (modification time) for each file.
+* On interactive start, record file `mtime` (modification time) for each file **and start watching the files** for changes.
+* When a watched file changes:
+
+ * Automatically reload from disk (rebuild the in-memory index).
+ * Show a visible indicator (e.g. a header badge like `Auto-reloaded (todos.md)`).
+ * If the changed file contains newly added tasks missing `id:`, run `enrich` on that file before rebuilding the index (so new tasks appear immediately).
+   - Disable with config `interactive.autoEnrichOnReload: false`.
+
 * Before writing changes to a file:
 
  * Re-check the file’s current `mtime`.
- * If `mtime` has changed since last time TUI touched it:
+ * If `mtime` has changed since last time TUI touched it, **force an automatic reload first** (no prompt), then attempt the write against the refreshed state.
 
- * Show a warning (e.g. in a popup):
- `"File todos.md changed externally. Reload now? (y/n)"`.
- * If user chooses **yes**:
-
- * Re-parse that file, rebuild `global_id -> lineNumber` mapping, update in-memory tasks from it.
- * Re-apply intended change if still valid.
- * If user chooses **no**:
-
- * Cancel this edit, keep current in-memory state, and show that the file may be out of sync.
-
-This “soft protection” avoids silently overwriting external changes while keeping behavior simple.
+This avoids silently overwriting external changes while keeping the workflow “always safe by default”.
 
 ---
 
