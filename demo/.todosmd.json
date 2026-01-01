@@ -1,0 +1,11 @@
+{
+  "files": ["todos.md"],
+  "output": "todos.json",
+  "interactive": {
+    "views": [
+      { "key": "7", "name": "Work", "query": "status:open area:work", "sort": "priority,bucket,due" },
+      { "key": "8", "name": "Personal", "query": "status:open area:personal", "sort": "bucket,due" },
+      { "key": "9", "name": "Low Energy", "query": "status:open energy:low", "sort": "bucket,project" }
+    ]
+  }
+}
