@@ -51,7 +51,7 @@ Type "# Or use the interactive TUI"
 Enter
 Sleep 800ms
 
-Type "tmd interactive"
+Type "tmd i"
 Enter
 Sleep 2500ms
 
