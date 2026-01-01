@@ -10,14 +10,14 @@ Manage todos across multiple projects in plain text. Query tasks like a database
 
 ## Features
 
+- **Just Markdown** — Your todos are plain `.md` files. Open them in any editor, read on mobile, edit with AI, or process with other tools
 - **Interactive TUI** — Full-screen terminal UI with vim-style navigation (`j/k`, `h/l`, `g/G`)
 - **Inline Views** — Embed live task lists in any markdown file with auto-sync
-- **Plain Markdown** — Tasks live in `.md` files, no proprietary format or database
 - **Powerful filters** — Query by project, due date, energy level, tags, and more
 - **Multi-project** — Manage todos across multiple files and projects from one place
 - **AI-ready** — Every command supports `--json` for LLM and automation workflows
 - **Obsidian-friendly** — Works seamlessly with Obsidian vaults and knowledge bases
-- **Zero lock-in** — Your data stays in readable Markdown forever
+- **Sync anywhere** — Commit to git, sync via iCloud/Dropbox, access from any device
 
 ## Why I Built This
 
@@ -29,6 +29,30 @@ The problem: **todos are scattered everywhere**. I needed a way to:
 - **Keep context local** — todos stay in their project files, not a separate app
 - **Work with AI** — structured `--json` output for AI agents to read and manipulate
 - **Stay in plain text** — no database, no lock-in, just Markdown
+
+## It's Just Markdown
+
+Your todos are stored in plain markdown files — nothing proprietary:
+
+```markdown
+# Mobile App [project:app area:work]
+
+- [ ] Fix login bug on iOS [id:1 priority:high due:2025-01-15]
+- [ ] Add push notifications [id:2 energy:high est:6h]
+  - [ ] Set up Firebase [id:2.1]
+  - [ ] Create notification service [id:2.2]
+- [x] Update dependencies [id:3]
+```
+
+**This means you can:**
+
+- Open and edit in any text editor (VS Code, Vim, Obsidian, etc.)
+- Read and manage on mobile with any markdown app
+- Let AI agents (Claude, GPT, Copilot) read and modify your tasks directly
+- Process with grep, sed, or any unix tool
+- Commit to git for version history and backup
+- Sync via iCloud, Dropbox, or any file sync service
+- Never worry about data export — it's already in a universal format
 
 ## Quick Start
 

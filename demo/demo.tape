@@ -1,28 +1,46 @@
 # VHS Demo for todos.md
+# Shows: 1) It's just markdown  2) Interactive TUI
 
 Output demo.gif
 
 Set Shell "bash"
-Set FontSize 14
+Set FontSize 13
 Set Width 1200
-Set Height 650
+Set Height 700
 Set Padding 20
-Set TypingSpeed 50ms
+Set TypingSpeed 40ms
 Set WindowBar Colorful
 Set WindowBarSize 40
 
-# Launch TUI directly
+# First, show it's just a markdown file
+Type "# Your todos are just markdown files"
+Enter
+Sleep 1s
+
+Type "cat todos.md | head -35"
+Enter
+Sleep 4s
+
+# Clear and launch TUI
+Type "clear"
+Enter
+Sleep 500ms
+
+Type "# Query and manage with tmd"
+Enter
+Sleep 1s
+
 Type "tmd interactive"
 Enter
 Sleep 3s
 
 # Navigate down
 Type "j"
-Sleep 400ms
+Sleep 300ms
 Type "j"
-Sleep 400ms
+Sleep 300ms
 Type "j"
-Sleep 400ms
+Sleep 300ms
 
 # Expand task with subtasks
 Type "l"
