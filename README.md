@@ -1,5 +1,8 @@
 # todos.md
 
+[![npm version](https://img.shields.io/npm/v/todosmd.svg)](https://www.npmjs.com/package/todosmd)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **A terminal-based task manager for Markdown files with vim keybindings.**
 
 Manage todos across multiple projects in plain text. Query tasks like a database, edit with familiar vim motions, and integrate with AI agents via JSON output.
