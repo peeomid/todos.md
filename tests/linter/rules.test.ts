@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { lintFiles } from '../../src/linter/linter.js';
 
 const TEST_DIR = path.join(process.cwd(), 'tests', 'fixtures');
@@ -131,7 +131,7 @@ describe('linter rules', () => {
 - [ ] Task 2 [id:2 due:2025-12-20]`
     );
 
-    const { issues, summary } = lintFiles([TEST_FILE]);
+    const { summary } = lintFiles([TEST_FILE]);
 
     expect(summary.errors).toBe(0);
     expect(summary.warnings).toBe(0);

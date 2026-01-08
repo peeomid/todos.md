@@ -24,4 +24,3 @@ export function shouldShowAutoReloadIndicator(
   if (!indicator) return false;
   return nowMs - indicator.lastAtMs <= ttlMs;
 }
-

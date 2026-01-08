@@ -1,57 +1,68 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import terminalKit from 'terminal-kit';
+import { formatDate, parseDate, parseRelativeDate } from '../cli/date-utils.js';
 import type { Config } from '../config/loader.js';
-import { buildIndex } from '../indexer/index.js';
-import type { TaskIndex, Task, Project, Priority } from '../schema/index.js';
+import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
+import { deleteTaskSubtree } from '../editor/task-deleter.js';
+import { markTaskDone, markTaskUndone } from '../editor/task-editor.js';
 import {
-  parseQueryString,
-  parseFilterArg,
-  parseQueryToFilterGroups,
+  insertTask,
+  insertTaskAfterTaskSameLevel,
+  insertTaskUnderSection,
+  type TaskMetadata,
+} from '../editor/task-inserter.js';
+import { enrichFiles } from '../enricher/index.js';
+import { buildIndex } from '../indexer/index.js';
+import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
+import {
   buildFilterGroups,
   composeFilterGroups,
-  isQueryOperatorToken,
   composeFilters,
   filterByText,
   groupTasks,
+  isQueryOperatorToken,
+  parseFilterArg,
+  parseQueryString,
+  parseQueryToFilterGroups,
+  type SortField,
   sortTasksByFields,
   sortTasksByFieldsWithOverrides,
-  type SortField,
 } from '../query/filters.js';
-import { markTaskDone, markTaskUndone } from '../editor/task-editor.js';
-import { deleteTaskSubtree } from '../editor/task-deleter.js';
-import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
-import { parseDate, parseRelativeDate, formatDate } from '../cli/date-utils.js';
-import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
-import { insertTask, insertTaskAfterTaskSameLevel, insertTaskUnderSection, type TaskMetadata } from '../editor/task-inserter.js';
-import { enrichFiles } from '../enricher/index.js';
-import { isSpaceKeyName } from './key-utils.js';
-import { shouldAllowGlobalQuit } from './key-policy.js';
-import { getStickyHeaderLabel } from './sticky-header.js';
-import { getFooterHeight } from './layout.js';
-import { renderLabeledInputField } from './input-render.js';
+import type { Priority, Project, Task, TaskIndex } from '../schema/index.js';
+import { decideAddTargetProjectId } from './add-target.js';
+import { type AutoReloadIndicator, formatAutoReloadLabel, shouldShowAutoReloadIndicator } from './auto-reload.js';
+import {
+  type AutocompleteState,
+  applySuggestion,
+  generateSuggestions,
+  getAutocompleteContext,
+} from './autocomplete.js';
+import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
 import { getNowToggleChanges } from './bucket-toggle.js';
+import { readCurrentMetadataBlockString } from './edit-flow.js';
+import { renderLabeledInputField } from './input-render.js';
+import { shouldAllowGlobalQuit } from './key-policy.js';
+import { isSpaceKeyName } from './key-utils.js';
+import { getFooterHeight } from './layout.js';
+import { confirmYesNo, promptAddTaskModal, promptEditTaskModal, promptText, showKeyMenu } from './prompts.js';
+import { getShorthandHelpLines } from './shorthand-help.js';
+import { getStickyHeaderLabel } from './sticky-header.js';
+import { orderTasksForTreeView } from './task-order.js';
 import {
   formatBucketSymbolShorthand,
   formatBucketTagShorthand,
   formatPriorityShorthand,
   getTaskShorthandTokens,
 } from './task-shorthands.js';
-import { confirmYesNo, promptAddTaskModal, promptEditTaskModal, promptText, showKeyMenu } from './prompts.js';
 import { setCursorVisible } from './term-cursor.js';
-import { decideAddTargetProjectId } from './add-target.js';
-import { getShorthandHelpLines } from './shorthand-help.js';
-import { readCurrentMetadataBlockString } from './edit-flow.js';
 import {
-  getAutocompleteContext,
-  generateSuggestions,
-  applySuggestion,
-  type AutocompleteState,
-} from './autocomplete.js';
-import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
-import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor, type TextInputState } from './text-input.js';
-import { formatAutoReloadLabel, shouldShowAutoReloadIndicator, type AutoReloadIndicator } from './auto-reload.js';
-import { orderTasksForTreeView } from './task-order.js';
+  applyTextInputKey,
+  createTextInput,
+  type TextInputState,
+  toCodepointCursor,
+  toCodeUnitCursor,
+} from './text-input.js';
 
 type Term = any;
 
@@ -145,14 +156,16 @@ function toggleBucketFocusInQuery(query: string, bucket: 'today' | 'upcoming' | 
   for (const token of tokens) {
     const parsed = parseFilterArg(token);
     if (parsed?.key !== 'bucket') continue;
-    for (const part of parsed.value.split(',').map((x) => x.trim()).filter(Boolean)) {
+    for (const part of parsed.value
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)) {
       if (part.startsWith('!') && part.length > 1) exclude.add(part.slice(1));
       else include.add(part);
     }
   }
 
-  const isExclusive =
-    include.size === 1 && include.has(bucket) && !exclude.has(bucket);
+  const isExclusive = include.size === 1 && include.has(bucket) && !exclude.has(bucket);
 
   const nextTokens = tokens.filter((t) => parseFilterArg(t)?.key !== 'bucket');
   if (isExclusive) {
@@ -270,7 +283,13 @@ function buildViews(config: Config): InteractiveView[] {
   const builtins: InteractiveView[] = [
     { key: '0', name: 'All', query: 'status:open', sort: 'project,priority,plan,due', kind: 'tasks' },
     { key: '1', name: 'Now', query: 'status:open bucket:now', sort: 'priority,plan,due', kind: 'tasks' },
-    { key: '2', name: 'Today', query: 'status:open (bucket:today | plan:today | due:today)', sort: 'priority,plan,due', kind: 'tasks' },
+    {
+      key: '2',
+      name: 'Today',
+      query: 'status:open (bucket:today | plan:today | due:today)',
+      sort: 'priority,plan,due',
+      kind: 'tasks',
+    },
     { key: '3', name: 'Upcoming', query: 'status:open bucket:upcoming', sort: 'priority,plan,due', kind: 'tasks' },
     { key: '4', name: 'Anytime', query: 'status:open bucket:anytime', sort: 'priority,plan,due', kind: 'tasks' },
     { key: '5', name: 'Someday', query: 'status:open bucket:someday', sort: 'priority,plan,due', kind: 'tasks' },
@@ -301,7 +320,7 @@ function getFileMtimes(index: TaskIndex): Map<string, number> {
   return m;
 }
 
-function formatPriority(p: Priority | undefined): string {
+function _formatPriority(p: Priority | undefined): string {
   return formatPriorityShorthand(p) || '   ';
 }
 
@@ -309,7 +328,7 @@ function truncate(s: string, max: number): string {
   if (max <= 0) return '';
   if (s.length <= max) return s;
   if (max <= 1) return s.slice(0, max);
-  return s.slice(0, max - 1) + '…';
+  return `${s.slice(0, max - 1)}…`;
 }
 
 function truncateByWidth(s: string, maxWidth: number): string {
@@ -342,7 +361,7 @@ function joinHelpChunks(chunks: string[], width: number): string {
   if (used < chunks.length) {
     const dots = `${sep}…`;
     if (terminalKit.stringWidth(out + dots) <= width) out += dots;
-    else if (terminalKit.stringWidth(out + '…') <= width) out += '…';
+    else if (terminalKit.stringWidth(`${out}…`) <= width) out += '…';
   }
 
   return truncateByWidth(out, width);
@@ -362,7 +381,9 @@ function getFooterHelpLines(
     const full = state.projectsList.active
       ? ['type = filter', '[Enter] done', '[Esc] cancel']
       : ['[/] filter', '[Enter] open project', '[Ctrl+N] add project'];
-    const compact = state.projectsList.active ? ['type = filter', '[Enter] done'] : ['[/] filter', '[Enter] open', '[Ctrl+N] add'];
+    const compact = state.projectsList.active
+      ? ['type = filter', '[Enter] done']
+      : ['[/] filter', '[Enter] open', '[Ctrl+N] add'];
     return { line1, line2: joinHelpChunks(width < 60 ? compact : full, width) };
   }
 
@@ -473,7 +494,7 @@ function findTaskLineNumberById(
       // Best effort: verify project context
       let currentProject: string | null = null;
       for (let i = 0; i < hintLineNumber; i++) {
-        const m = lines[i]!.match(PROJECT_HEADING_REGEX);
+        const m = lines[i]?.match(PROJECT_HEADING_REGEX);
         if (m?.[2]) currentProject = m[2];
       }
       if (!currentProject || currentProject === projectId) {
@@ -793,8 +814,7 @@ function render(state: SessionState, term: Term): void {
         const textMax = Math.max(0, leftMax - leftPrefixWidth);
         const shownText = truncateByWidth(t.text, textMax);
 
-        const priStyle: keyof typeof style =
-          t.priority === 'high' ? 'red' : t.priority === 'low' ? 'dim' : 'text';
+        const priStyle: keyof typeof style = t.priority === 'high' ? 'red' : t.priority === 'low' ? 'dim' : 'text';
         const bucketStyle: keyof typeof style =
           t.bucket === 'now'
             ? 'bucketNow'
@@ -825,10 +845,7 @@ function render(state: SessionState, term: Term): void {
         segments.push({ text: ' ', style: 'text' });
         segments.push({ text: shownText, style: textStyle });
 
-        writeSegments(
-          segments,
-          leftMax
-        );
+        writeSegments(segments, leftMax);
 
         // Spacer between columns
         term('  ');
@@ -902,12 +919,7 @@ function render(state: SessionState, term: Term): void {
   } else if (selectedProject) {
     style.bold(truncate(`${selectedProject.id} — ${selectedProject.name}`, width));
     term.moveTo(1, footerTop + 2);
-    style.text(
-      truncate(
-        `area: ${selectedProject.area ?? '-'}`,
-        width
-      )
-    );
+    style.text(truncate(`area: ${selectedProject.area ?? '-'}`, width));
     term.moveTo(1, footerTop + 3);
     style.dim(truncate('', width));
   } else {
@@ -1099,7 +1111,7 @@ function recompute(state: SessionState): void {
   const prevHeaderProjectId = prevRow?.kind === 'header' ? prevRow.projectId : null;
   const prevArea = prevRow?.kind === 'area' ? prevRow.area : null;
   const prevSectionId = prevRow?.kind === 'section' ? prevRow.sectionId : null;
-  const prevTaskProjectId = prevSelectedId ? state.index.tasks[prevSelectedId]?.projectId ?? null : null;
+  const prevTaskProjectId = prevSelectedId ? (state.index.tasks[prevSelectedId]?.projectId ?? null) : null;
   state.renderRows = [];
 
   const areaRowIndexByArea = new Map<string, number>();
@@ -1181,7 +1193,7 @@ function recompute(state: SessionState): void {
             hi = mid - 1;
           }
         }
-        return best >= 0 ? arr[best]!.id : null;
+        return best >= 0 ? (arr[best]?.id ?? null) : null;
       };
 
       const tasksBySection = new Map<string | null, Task[]>();
@@ -1214,7 +1226,9 @@ function recompute(state: SessionState): void {
       for (const id of sectionById.keys()) computeTotal(id);
 
       // Render tasks that have no section heading above them.
-      for (const task of orderTasksForTreeView(tasksBySection.get(null) ?? [], treeSortFields, { priorityOrder: treePriorityOrder })) {
+      for (const task of orderTasksForTreeView(tasksBySection.get(null) ?? [], treeSortFields, {
+        priorityOrder: treePriorityOrder,
+      })) {
         if (isHiddenByCollapsedAncestor(task)) continue;
         const idx = state.renderRows.length;
         state.renderRows.push({ kind: 'task', task, indent: baseIndent, sectionId: null });
@@ -1240,7 +1254,9 @@ function recompute(state: SessionState): void {
         for (const cid of childrenByParent.get(sectionId) ?? []) {
           renderSection(cid);
         }
-        for (const task of orderTasksForTreeView(tasksBySection.get(sectionId) ?? [], treeSortFields, { priorityOrder: treePriorityOrder })) {
+        for (const task of orderTasksForTreeView(tasksBySection.get(sectionId) ?? [], treeSortFields, {
+          priorityOrder: treePriorityOrder,
+        })) {
           if (isHiddenByCollapsedAncestor(task)) continue;
           const tIdx = state.renderRows.length;
           state.renderRows.push({ kind: 'task', task, indent: taskIndent, sectionId });
@@ -1257,8 +1273,9 @@ function recompute(state: SessionState): void {
     const explicitProjectId =
       (inProjectDrilldown ? state.projects.drilldownProjectId : null) ?? explicitProjectIdFromQuery ?? null;
 
-    const projectIdsToRender: string[] =
-      explicitProjectId ? [explicitProjectId] : [...grouped.keys()].sort((a, b) => a.localeCompare(b));
+    const projectIdsToRender: string[] = explicitProjectId
+      ? [explicitProjectId]
+      : [...grouped.keys()].sort((a, b) => a.localeCompare(b));
 
     const projectsByArea = new Map<string | null, string[]>();
     const areaTaskCounts = new Map<string, number>();
@@ -1358,8 +1375,8 @@ function recompute(state: SessionState): void {
     } else {
       const headerFallback = prevHeaderProjectId ?? prevTaskProjectId;
       if (headerFallback && headerRowIndexByProjectId.has(headerFallback)) {
-      state.selection.row = headerRowIndexByProjectId.get(headerFallback)!;
-      state.selection.selectedId = null;
+        state.selection.row = headerRowIndexByProjectId.get(headerFallback)!;
+        state.selection.selectedId = null;
       } else {
         if (prevArea && areaRowIndexByArea.has(prevArea)) {
           state.selection.row = areaRowIndexByArea.get(prevArea)!;
@@ -1379,11 +1396,7 @@ function recompute(state: SessionState): void {
     }
   }
 
-  state.selection.scroll = clamp(
-    state.selection.scroll,
-    0,
-    Math.max(0, state.renderRows.length - 1)
-  );
+  state.selection.scroll = clamp(state.selection.scroll, 0, Math.max(0, state.renderRows.length - 1));
 }
 
 function getSelectedTask(state: SessionState): Task | null {
@@ -1401,7 +1414,7 @@ function getSelectedProject(state: SessionState): Project | null {
 }
 
 async function ensureFileFresh(
-  term: Term,
+  _term: Term,
   state: SessionState,
   filePath: string,
   refreshFromDisk: () => void
@@ -1713,7 +1726,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
   }
 
-  function setNextView(delta: number): void {
+  function _setNextView(delta: number): void {
     const next = (state.viewIndex + delta + state.views.length) % state.views.length;
     state.viewIndex = next;
     state.projects.drilldownProjectId = null;
@@ -1928,13 +1941,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const choice = await showKeyMenu(
       term,
       `Set ${which === 'plan' ? 'plan date' : 'due date'} — ${selected.globalId}`,
-      [
-        `Task: ${selected.text}`,
-        '',
-        '[t] today',
-        '[m] manual (YYYY-MM-DD or +Nd/+Nw)',
-        '[c] clear',
-      ],
+      [`Task: ${selected.text}`, '', '[t] today', '[m] manual (YYYY-MM-DD or +Nd/+Nw)', '[c] clear'],
       ['t', 'm', 'c'],
       state.colorsDisabled
     );
@@ -2028,7 +2035,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const selectedRow = state.renderRows[state.selection.row];
     const defaultProjectId = decision.projectId ?? null;
     const defaultSectionId =
-      selectedRow?.kind === 'task' || selectedRow?.kind === 'section' ? selectedRow.sectionId ?? null : null;
+      selectedRow?.kind === 'task' || selectedRow?.kind === 'section' ? (selectedRow.sectionId ?? null) : null;
     const insertAfterTaskId = selectedRow?.kind === 'task' ? selectedRow.task.globalId : null;
 
     const initialProjectId =
@@ -2115,7 +2122,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     const cursorTask = insertAfterTaskId ? state.index.tasks[insertAfterTaskId] : null;
     const cursorParentLocalId =
       useCursorPlacement && cursorTask?.indentLevel && cursorTask.indentLevel > 0 && cursorTask.parentId
-        ? cursorTask.parentId.split(':')[1] ?? undefined
+        ? (cursorTask.parentId.split(':')[1] ?? undefined)
         : undefined;
     const newId = generateNextId(existingIds, cursorParentLocalId);
     const created = todayIso();
@@ -2130,7 +2137,12 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       plan: bucket === 'today' && !planParsed ? created : planParsed,
       due: dueParsed,
       area: areaRaw || undefined,
-      tags: tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
+      tags: tagsRaw
+        ? tagsRaw
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : undefined,
     };
 
     const insertResult = useCursorPlacement
@@ -2222,13 +2234,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
 
     const suggestedId = slugifyProjectId(name);
-    const idInput = await promptText(
-      term,
-      `${title} (2/3)`,
-      'Project id (slug):',
-      suggestedId,
-      state.colorsDisabled
-    );
+    const idInput = await promptText(term, `${title} (2/3)`, 'Project id (slug):', suggestedId, state.colorsDisabled);
     if (idInput === null) return;
     const projectId = slugifyProjectId(idInput);
     if (!projectId || !/^[a-z0-9][a-z0-9-]*$/.test(projectId)) {
@@ -2406,21 +2412,12 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     if (state.search.active) {
       // TAB: Apply autocomplete suggestion
       if (name === 'TAB') {
-        if (
-          state.search.autocomplete.active &&
-          state.search.autocomplete.suggestions.length > 0
-        ) {
-          const selected =
-            state.search.autocomplete.suggestions[state.search.autocomplete.selectedIndex]!;
+        if (state.search.autocomplete.active && state.search.autocomplete.suggestions.length > 0) {
+          const selected = state.search.autocomplete.suggestions[state.search.autocomplete.selectedIndex]!;
           const context = state.search.autocomplete.context!;
 
           const cursorPos = toCodeUnitCursor(state.search.input.value, state.search.input.cursor);
-          const { newInput, newCursorPos } = applySuggestion(
-            state.search.input.value,
-            cursorPos,
-            selected,
-            context
-          );
+          const { newInput, newCursorPos } = applySuggestion(state.search.input.value, cursorPos, selected, context);
 
           state.search.input = { value: newInput, cursor: toCodepointCursor(newInput, newCursorPos) };
 
@@ -2434,10 +2431,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
       // UP/DOWN: Navigate autocomplete suggestions
       if (name === 'UP' && state.search.autocomplete.active) {
-        state.search.autocomplete.selectedIndex = Math.max(
-          0,
-          state.search.autocomplete.selectedIndex - 1
-        );
+        state.search.autocomplete.selectedIndex = Math.max(0, state.search.autocomplete.selectedIndex - 1);
         render(state, term);
         return;
       }
@@ -2557,7 +2551,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
         return;
       }
       const applied = applyTextInputKey(state.projectsList.input, name);
-      if (applied && applied.didChangeValue) {
+      if (applied?.didChangeValue) {
         state.projectsList.input = applied.state;
         recompute(state);
         render(state, term);
@@ -2610,14 +2604,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
       state.busy = true;
       render(state, term);
       try {
-        await showKeyMenu(
-          term,
-          'Help',
-          getShorthandHelpLines(),
-          [],
-          state.colorsDisabled,
-          { enter: '' }
-        );
+        await showKeyMenu(term, 'Help', getShorthandHelpLines(), [], state.colorsDisabled, { enter: '' });
       } finally {
         state.busy = false;
         recompute(state);
@@ -2706,7 +2693,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     // - Right/l: expand current node, else go to first child
     if (!isProjectsList && (name === 'LEFT' || name === 'h' || name === 'RIGHT' || name === 'l')) {
       const isLeft = name === 'LEFT' || name === 'h';
-      const isRight = !isLeft;
+      const _isRight = !isLeft;
       const rowIndex = state.selection.row;
       const row = state.renderRows[rowIndex];
       if (!row) return;

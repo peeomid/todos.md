@@ -6,23 +6,23 @@
  */
 
 import fs from 'node:fs';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
+import { markTaskDone } from '../editor/task-editor.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { greenText, dimText, cyanText } from './terminal.js';
-import { markTaskDone } from '../editor/task-editor.js';
-import { findTmdBlocks, replaceBlockContent, parseTasksInBlock, type TmdBlock } from '../sync/tmd-block.js';
+import type { Task, TaskIndex } from '../schema/index.js';
 import { renderTasksAsMarkdown } from '../sync/task-renderer.js';
+import { findTmdBlocks, parseTasksInBlock, replaceBlockContent } from '../sync/tmd-block.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import {
-  parseQueryToFilterGroups,
+  applyDefaultStatusToGroups,
   buildFilterGroups,
   composeFilterGroups,
-  applyDefaultStatusToGroups,
+  parseQueryToFilterGroups,
   sortTasks,
 } from './list-filters.js';
-import type { Task, TaskIndex } from '../schema/index.js';
+import { dimText } from './terminal.js';
 
 interface SyncOptions {
   viewFiles: string[];
@@ -77,20 +77,13 @@ function parseSyncFlags(args: string[]): SyncOptions {
     '-G',
   ]);
 
-  const valueFlags = extractFlags(args, [
-    '--config',
-    '-c',
-    '--output',
-    '-o',
-  ]);
+  const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
 
   // Extract multiple --file/-f flags
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, []);

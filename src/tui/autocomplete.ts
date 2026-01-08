@@ -128,10 +128,7 @@ type SpecRegistry = Record<
 /**
  * Analyze current input and cursor position to determine autocomplete context
  */
-export function getAutocompleteContext(
-  input: string,
-  cursorPos: number
-): AutocompleteContext {
+export function getAutocompleteContext(input: string, cursorPos: number): AutocompleteContext {
   // Handle empty input
   if (!input || cursorPos === 0) {
     return {
@@ -209,10 +206,7 @@ export function getAutocompleteContext(
 /**
  * Generate suggestions based on context
  */
-export function generateSuggestions(
-  context: AutocompleteContext,
-  allTasks: Task[]
-): AutocompleteSuggestion[] {
+export function generateSuggestions(context: AutocompleteContext, allTasks: Task[]): AutocompleteSuggestion[] {
   return generateSuggestionsWithSpecs(context, allTasks, FILTER_SPECS as unknown as SpecRegistry);
 }
 
@@ -235,9 +229,7 @@ function getKeySuggestions(partial: string, specs: SpecRegistry): AutocompleteSu
 
   // Filter keys that start with partial (case-insensitive)
   // Show all keys if partial is empty
-  const matches = filterKeys.filter((key) =>
-    partial ? key.toLowerCase().startsWith(partial.toLowerCase()) : true
-  );
+  const matches = filterKeys.filter((key) => (partial ? key.toLowerCase().startsWith(partial.toLowerCase()) : true));
 
   return matches.map((key) => ({
     type: 'key' as const,
@@ -261,9 +253,7 @@ function getValueSuggestions(
 
   if (Array.isArray(spec.values)) {
     // Static values (status, bucket, energy, priority)
-    const matches = spec.values.filter((val) =>
-      val.toLowerCase().startsWith(partial.toLowerCase())
-    );
+    const matches = spec.values.filter((val) => val.toLowerCase().startsWith(partial.toLowerCase()));
     return matches.map((val) => {
       const preview = spec.valuePreviews?.[val];
       return {
@@ -295,11 +285,7 @@ function getValueSuggestions(
 /**
  * Extract dynamic values from task index
  */
-function getDynamicValueSuggestions(
-  filterKey: string,
-  partial: string,
-  allTasks: Task[]
-): AutocompleteSuggestion[] {
+function getDynamicValueSuggestions(filterKey: string, partial: string, allTasks: Task[]): AutocompleteSuggestion[] {
   const uniqueValues = new Set<string>();
 
   allTasks.forEach((task) => {
@@ -313,7 +299,7 @@ function getDynamicValueSuggestions(
         value = task.area;
         break;
       case 'tags':
-        task.tags?.forEach((tag) => uniqueValues.add(tag));
+        for (const tag of task.tags ?? []) uniqueValues.add(tag);
         return;
       case 'parent':
         value = task.parentId ?? undefined;
@@ -323,9 +309,7 @@ function getDynamicValueSuggestions(
     if (value) uniqueValues.add(value);
   });
 
-  const matches = Array.from(uniqueValues).filter((val) =>
-    val.toLowerCase().includes(partial.toLowerCase())
-  );
+  const matches = Array.from(uniqueValues).filter((val) => val.toLowerCase().includes(partial.toLowerCase()));
 
   // Sort alphabetically and limit to 10 suggestions
   return matches
@@ -400,9 +384,7 @@ export function applySuggestion(
   if (tokenIndex === -1 || !tokenToReplace) {
     // Cursor at end after trailing space, append suggestion
     const replacement =
-      suggestion.type === 'value' && context.filterKey
-        ? `${context.filterKey}:${suggestion.text}`
-        : suggestion.text;
+      suggestion.type === 'value' && context.filterKey ? `${context.filterKey}:${suggestion.text}` : suggestion.text;
     const prefix = input.trimEnd();
     const sep = prefix ? ' ' : '';
     const suffix = suggestion.type === 'value' ? ' ' : '';
@@ -412,9 +394,7 @@ export function applySuggestion(
 
   // Build replacement text
   const replacement =
-    suggestion.type === 'value' && context.filterKey
-      ? `${context.filterKey}:${suggestion.text}`
-      : suggestion.text;
+    suggestion.type === 'value' && context.filterKey ? `${context.filterKey}:${suggestion.text}` : suggestion.text;
 
   // Reconstruct input with replacement
   const before = input.slice(0, tokenToReplace.start);

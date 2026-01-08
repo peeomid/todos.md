@@ -52,12 +52,7 @@ export function getDefaultProjectConfigPath(startDir: string = process.cwd()): s
 
 export function getGlobalConfigPath(): string {
   // Recompute each call so tests that stub HOME behave correctly.
-  return path.join(
-    process.env.HOME ?? process.env.USERPROFILE ?? '',
-    '.config',
-    'todosmd',
-    'config.json'
-  );
+  return path.join(process.env.HOME ?? process.env.USERPROFILE ?? '', '.config', 'todosmd', 'config.json');
 }
 
 export function findConfigPath(startDir: string = process.cwd()): string | null {

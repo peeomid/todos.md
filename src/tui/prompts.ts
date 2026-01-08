@@ -1,19 +1,24 @@
-import { setCursorVisible } from './term-cursor.js';
-import { isSpaceKeyName } from './key-utils.js';
-import { renderLabeledInputField } from './input-render.js';
-import { applyTextInputKey, createTextInput, toCodeUnitCursor, toCodepointCursor, type TextInputState } from './text-input.js';
+import terminalKit from 'terminal-kit';
+import type { SectionHeading, Task } from '../schema/index.js';
 import {
-  getAutocompleteContext,
-  generateSuggestionsWithSpecs,
-  applySuggestion,
-  METADATA_SPECS,
   ADD_METADATA_SPECS,
   type AutocompleteState,
+  applySuggestion,
+  generateSuggestionsWithSpecs,
+  getAutocompleteContext,
+  METADATA_SPECS,
 } from './autocomplete.js';
 import { renderAutocompleteSuggestionsBox } from './autocomplete-render.js';
-import type { Task } from '../schema/index.js';
-import type { SectionHeading } from '../schema/index.js';
-import terminalKit from 'terminal-kit';
+import { renderLabeledInputField } from './input-render.js';
+import { isSpaceKeyName } from './key-utils.js';
+import { setCursorVisible } from './term-cursor.js';
+import {
+  applyTextInputKey,
+  createTextInput,
+  type TextInputState,
+  toCodepointCursor,
+  toCodeUnitCursor,
+} from './text-input.js';
 
 type Term = any;
 
@@ -32,7 +37,7 @@ function titleHintForKeyMenu(allowed: string[], hasEnter: boolean): string {
 
 function fieldLabelFromPromptLabel(label: string): string {
   const lower = label.trim().toLowerCase();
-  const pick = (s: string) => `${s[0]!.toUpperCase()}${s.slice(1)} `;
+  const pick = (s: string) => `${s[0]?.toUpperCase()}${s.slice(1)} `;
 
   if (lower.includes('task text') || lower.includes('text')) return pick('text');
   if (lower.includes('metadata')) return pick('metadata');
@@ -219,9 +224,10 @@ export async function showKeyMenu(
     term.moveTo(1, 1);
     boldOrPlain(term, colorsDisabled)(terminalKit.truncateString(title, width));
     term.moveTo(1, 2);
-    dimOrPlain(term, colorsDisabled)(
-      terminalKit.truncateString(titleHintForKeyMenu(allowed, options?.enter !== undefined), width)
-    );
+    dimOrPlain(
+      term,
+      colorsDisabled
+    )(terminalKit.truncateString(titleHintForKeyMenu(allowed, options?.enter !== undefined), width));
 
     const shown = lines.slice(scrollTop, scrollTop + contentMaxRows);
     for (let i = 0; i < shown.length; i++) {
@@ -495,7 +501,10 @@ export async function pickProjectTypeahead(
     term.moveTo(1, 1);
     boldOrPlain(term, colorsDisabled)(title);
     term.moveTo(1, 2);
-    dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('[Type] filter  [↑/↓] select  [Enter] choose  [Esc] cancel', width));
+    dimOrPlain(
+      term,
+      colorsDisabled
+    )(terminalKit.truncateString('[Type] filter  [↑/↓] select  [Enter] choose  [Esc] cancel', width));
     term.moveTo(1, 3);
     eraseLineAfterSafe(term);
     const { cursorCol } = renderLabeledInputField(term, {
@@ -611,9 +620,10 @@ export async function promptMetadataBlock(options: {
     term.moveTo(1, 1);
     boldOrPlain(term, colorsDisabled)(terminalKit.truncateString(title, width));
     term.moveTo(1, 2);
-    dimOrPlain(term, colorsDisabled)(
-      terminalKit.truncateString('[Type] key:value  [Tab] apply  [↑/↓] select  [Enter] save  [Esc] cancel', width)
-    );
+    dimOrPlain(
+      term,
+      colorsDisabled
+    )(terminalKit.truncateString('[Type] key:value  [Tab] apply  [↑/↓] select  [Enter] save  [Esc] cancel', width));
     if (taskLine) {
       term.moveTo(1, 3);
       dimOrPlain(term, colorsDisabled)(terminalKit.truncateString(taskLine, width));
@@ -636,9 +646,10 @@ export async function promptMetadataBlock(options: {
     term.moveTo(1, afterInputRow);
     eraseLineAfterSafe(term);
     try {
-      dimOrPlain(term, colorsDisabled)(
-        terminalKit.truncateString(`Saved as: ${wrapMetadata(input.value) || '(empty)'}`, width)
-      );
+      dimOrPlain(
+        term,
+        colorsDisabled
+      )(terminalKit.truncateString(`Saved as: ${wrapMetadata(input.value) || '(empty)'}`, width));
     } catch {
       dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('Saved as: (invalid metadata)', width));
     }
@@ -817,17 +828,19 @@ export async function promptEditTaskModal(options: {
     if (message) {
       redOrPlain(term, colorsDisabled)(terminalKit.truncateString(message, width));
     } else if (focus === 'meta' && metaAutocomplete.active) {
-      dimOrPlain(term, colorsDisabled)(
-        terminalKit.truncateString('Meta autocomplete: Tab/Enter applies the selected suggestion', width)
-      );
+      dimOrPlain(
+        term,
+        colorsDisabled
+      )(terminalKit.truncateString('Meta autocomplete: Tab/Enter applies the selected suggestion', width));
     } else {
-      dimOrPlain(term, colorsDisabled)(
-        terminalKit.truncateString(focus === 'text' ? 'Enter → Meta' : 'Enter → Save', width)
-      );
+      dimOrPlain(
+        term,
+        colorsDisabled
+      )(terminalKit.truncateString(focus === 'text' ? 'Enter → Meta' : 'Enter → Save', width));
     }
 
     // Suggestions below metadata field (only when meta focused)
-    const remainingRows = (footerRow - 1) - suggestStartRow + 1;
+    const remainingRows = footerRow - 1 - suggestStartRow + 1;
     if (focus === 'meta' && metaAutocomplete.active && remainingRows >= 3) {
       renderAutocompleteSuggestionsBox(term, {
         suggestions: metaAutocomplete.suggestions,
@@ -848,7 +861,8 @@ export async function promptEditTaskModal(options: {
       : '[Tab] next  [Shift+Tab] prev  [Enter] next/save  [↑/↓] switch  [Esc] cancel';
     dimOrPlain(term, colorsDisabled)(terminalKit.truncateString(footerHelp, width));
 
-    const cursorPos = focus === 'text' ? { x: textCursor.cursorCol, y: textRow } : { x: metaCursor.cursorCol, y: metaRow };
+    const cursorPos =
+      focus === 'text' ? { x: textCursor.cursorCol, y: textRow } : { x: metaCursor.cursorCol, y: metaRow };
     term.moveTo(cursorPos.x, cursorPos.y);
     setCursorVisible(term, true);
   }
@@ -1048,7 +1062,10 @@ export async function promptAddTaskModal(options: {
       display: p.id,
       description: p.area ? `${p.name} (${p.area})` : p.name,
     }));
-    projectList.selectedIndex = Math.max(0, Math.min(projectList.selectedIndex, Math.max(0, projectList.suggestions.length - 1)));
+    projectList.selectedIndex = Math.max(
+      0,
+      Math.min(projectList.selectedIndex, Math.max(0, projectList.suggestions.length - 1))
+    );
     projectList.active = projectList.suggestions.length > 0;
   }
 
@@ -1108,7 +1125,10 @@ export async function promptAddTaskModal(options: {
         description: `line ${s.lineNumber}`,
       })),
     ];
-    headerList.selectedIndex = Math.max(0, Math.min(headerList.selectedIndex, Math.max(0, headerList.suggestions.length - 1)));
+    headerList.selectedIndex = Math.max(
+      0,
+      Math.min(headerList.selectedIndex, Math.max(0, headerList.suggestions.length - 1))
+    );
     headerList.active = headerList.suggestions.length > 0;
   }
 
@@ -1262,7 +1282,7 @@ export async function promptAddTaskModal(options: {
     eraseLineAfterSafe(term);
     const selectedHeader = headerSelected ? sections.find((s) => s.id === headerSelected) : undefined;
     const headerDisplay = headerSelected
-      ? selectedHeader?.name ?? '(header)'
+      ? (selectedHeader?.name ?? '(header)')
       : headerQueryInput.value
         ? headerQueryInput.value
         : '(no header)';
@@ -1322,9 +1342,10 @@ export async function promptAddTaskModal(options: {
       dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('Enter → Meta', width));
     } else if (focus === 'meta') {
       try {
-        dimOrPlain(term, colorsDisabled)(
-          terminalKit.truncateString(`Will save meta: ${wrapMetadata(metaInput.value) || '(none)'}`, width)
-        );
+        dimOrPlain(
+          term,
+          colorsDisabled
+        )(terminalKit.truncateString(`Will save meta: ${wrapMetadata(metaInput.value) || '(none)'}`, width));
       } catch {
         dimOrPlain(term, colorsDisabled)(terminalKit.truncateString('Meta is invalid', width));
       }
@@ -1332,7 +1353,7 @@ export async function promptAddTaskModal(options: {
 
     const list = focus === 'project' ? projectList : focus === 'header' ? headerList : metaAutocomplete;
     const showList = list.active && (focus === 'project' || focus === 'header' || focus === 'meta');
-    const remainingRows = (footerRow - 1) - suggestStartRow + 1;
+    const remainingRows = footerRow - 1 - suggestStartRow + 1;
     if (showList && remainingRows >= 3) {
       renderAutocompleteSuggestionsBox(term, {
         suggestions: list.suggestions,
@@ -1358,9 +1379,9 @@ export async function promptAddTaskModal(options: {
         ? { x: projectCursor.cursorCol, y: projectRow }
         : focus === 'header'
           ? { x: headerCursor.cursorCol, y: headerRow }
-        : focus === 'text'
-          ? { x: textCursor.cursorCol, y: textRow }
-          : { x: metaCursor.cursorCol, y: metaRow };
+          : focus === 'text'
+            ? { x: textCursor.cursorCol, y: textRow }
+            : { x: metaCursor.cursorCol, y: metaRow };
     term.moveTo(cursorPos.x, cursorPos.y);
     setCursorVisible(term, true);
   }
@@ -1372,74 +1393,169 @@ export async function promptAddTaskModal(options: {
 
   return await new Promise<{ projectId: string; sectionId: string | null; text: string; metadataInner: string } | null>(
     (resolve) => {
-    const handler = (name: string) => {
-      message = null;
+      const handler = (name: string) => {
+        message = null;
 
-      const listActive =
-        (focus === 'project' && projectList.active) ||
-        (focus === 'header' && headerList.active) ||
-        (focus === 'meta' && metaAutocomplete.active);
+        const listActive =
+          (focus === 'project' && projectList.active) ||
+          (focus === 'header' && headerList.active) ||
+          (focus === 'meta' && metaAutocomplete.active);
 
-      if (name === 'ESCAPE' || name === 'CTRL_C') {
-        term.removeListener('key', handler);
-        setCursorVisible(term, false);
-        resolve(null);
-        return;
-      }
+        if (name === 'ESCAPE' || name === 'CTRL_C') {
+          term.removeListener('key', handler);
+          setCursorVisible(term, false);
+          resolve(null);
+          return;
+        }
 
-      if ((name === 'UP' || name === 'DOWN') && listActive) {
-        const list = focus === 'project' ? projectList : focus === 'header' ? headerList : metaAutocomplete;
-        list.selectedIndex =
-          name === 'UP'
-            ? Math.max(0, list.selectedIndex - 1)
-            : Math.min(list.suggestions.length - 1, list.selectedIndex + 1);
-        render();
-        return;
-      }
+        if ((name === 'UP' || name === 'DOWN') && listActive) {
+          const list = focus === 'project' ? projectList : focus === 'header' ? headerList : metaAutocomplete;
+          list.selectedIndex =
+            name === 'UP'
+              ? Math.max(0, list.selectedIndex - 1)
+              : Math.min(list.suggestions.length - 1, list.selectedIndex + 1);
+          render();
+          return;
+        }
 
-      if ((name === 'UP' || name === 'DOWN') && !listActive) {
-        if (name === 'UP') focusPrevField();
-        else focusNextField();
-        render();
-        return;
-      }
+        if ((name === 'UP' || name === 'DOWN') && !listActive) {
+          if (name === 'UP') focusPrevField();
+          else focusNextField();
+          render();
+          return;
+        }
 
-      if (isShiftTabKeyName(name)) {
-        focusPrevField();
-        render();
-        return;
-      }
+        if (isShiftTabKeyName(name)) {
+          focusPrevField();
+          render();
+          return;
+        }
 
-      if ((name === 'TAB' || name === 'ENTER') && listActive) {
-        applySelectedSuggestion(focus === 'project' ? projectList : focus === 'header' ? headerList : metaAutocomplete);
-        computeProjectSuggestions();
-        computeHeaderSuggestions();
-        updateMetaAutocomplete();
-        render();
-        return;
-      }
+        if ((name === 'TAB' || name === 'ENTER') && listActive) {
+          applySelectedSuggestion(
+            focus === 'project' ? projectList : focus === 'header' ? headerList : metaAutocomplete
+          );
+          computeProjectSuggestions();
+          computeHeaderSuggestions();
+          updateMetaAutocomplete();
+          render();
+          return;
+        }
 
-      if (name === 'TAB' && !listActive) {
-        const moved = tryAdvanceFromCurrentField();
-        computeProjectSuggestions();
-        computeHeaderSuggestions();
-        updateMetaAutocomplete();
-        render();
-        return;
-      }
+        if (name === 'TAB' && !listActive) {
+          const _moved = tryAdvanceFromCurrentField();
+          computeProjectSuggestions();
+          computeHeaderSuggestions();
+          updateMetaAutocomplete();
+          render();
+          return;
+        }
 
-      if (name === 'ENTER' && !listActive) {
+        if (name === 'ENTER' && !listActive) {
+          if (focus === 'project') {
+            if (!projectSelected) {
+              message = 'Choose a project';
+              computeProjectSuggestions();
+              render();
+              return;
+            }
+            focusNextField();
+            render();
+            return;
+          }
+          if (focus === 'header') {
+            if (!projectSelected) {
+              message = 'Choose a project';
+              focus = 'project';
+              computeProjectSuggestions();
+              render();
+              return;
+            }
+            focusNextField();
+            render();
+            return;
+          }
+          if (focus === 'text') {
+            if (!textInput.value.trim()) {
+              message = 'Task text is required';
+              render();
+              return;
+            }
+            focusNextField();
+            render();
+            return;
+          }
+          if (focus === 'meta') {
+            if (!projectSelected) {
+              message = 'Choose a project';
+              focus = 'project';
+              computeProjectSuggestions();
+              render();
+              return;
+            }
+            const trimmedText = textInput.value.trim();
+            if (!trimmedText) {
+              message = 'Task text is required';
+              focus = 'text';
+              render();
+              return;
+            }
+            try {
+              wrapMetadata(metaInput.value); // validate
+            } catch (e) {
+              message = e instanceof Error ? e.message : String(e);
+              updateMetaAutocomplete();
+              render();
+              return;
+            }
+            term.removeListener('key', handler);
+            setCursorVisible(term, false);
+            resolve({
+              projectId: projectSelected,
+              sectionId: headerSelected,
+              text: trimmedText,
+              metadataInner: metaInput.value.trim(),
+            });
+            return;
+          }
+        }
+
         if (focus === 'project') {
-          if (!projectSelected) {
-            message = 'Choose a project';
+          if (projectSelected) {
+            // Any edit action clears selection and enters filter mode.
+            const isEditKey =
+              name === 'BACKSPACE' ||
+              name === 'DELETE' ||
+              name === 'DEL' ||
+              name === 'CTRL_D' ||
+              name === 'ALT_BACKSPACE' ||
+              name === 'META_BACKSPACE' ||
+              name === 'CTRL_W' ||
+              name === 'CTRL_U' ||
+              name === 'CMD_BACKSPACE' ||
+              name === 'CTRL_K' ||
+              isSpaceKeyName(name) ||
+              name.length === 1;
+
+            if (!isEditKey) return;
+
+            projectSelected = null;
+            projectQueryInput = createTextInput('');
+            headerSelected = null;
+            headerQueryInput = createTextInput('');
+          }
+
+          const applied = applyTextInputKey(projectQueryInput, name);
+          if (applied) {
+            projectQueryInput = applied.state;
+            if (applied.didChangeValue) projectList.selectedIndex = 0;
             computeProjectSuggestions();
             render();
             return;
           }
-          focusNextField();
-          render();
           return;
         }
+
         if (focus === 'header') {
           if (!projectSelected) {
             message = 'Choose a project';
@@ -1448,153 +1564,60 @@ export async function promptAddTaskModal(options: {
             render();
             return;
           }
-          focusNextField();
-          render();
+
+          if (headerSelected) {
+            const isEditKey =
+              name === 'BACKSPACE' ||
+              name === 'DELETE' ||
+              name === 'DEL' ||
+              name === 'CTRL_D' ||
+              name === 'ALT_BACKSPACE' ||
+              name === 'META_BACKSPACE' ||
+              name === 'CTRL_W' ||
+              name === 'CTRL_U' ||
+              name === 'CMD_BACKSPACE' ||
+              name === 'CTRL_K' ||
+              isSpaceKeyName(name) ||
+              name.length === 1;
+
+            if (!isEditKey) return;
+
+            headerSelected = null;
+            headerQueryInput = createTextInput('');
+          }
+
+          const applied = applyTextInputKey(headerQueryInput, name);
+          if (applied) {
+            headerQueryInput = applied.state;
+            if (applied.didChangeValue) headerList.selectedIndex = 0;
+            computeHeaderSuggestions();
+            render();
+            return;
+          }
           return;
         }
+
         if (focus === 'text') {
-          if (!textInput.value.trim()) {
-            message = 'Task text is required';
+          const applied = applyTextInputKey(textInput, name);
+          if (applied) {
+            textInput = applied.state;
             render();
             return;
           }
-          focusNextField();
-          render();
           return;
         }
+
         if (focus === 'meta') {
-          if (!projectSelected) {
-            message = 'Choose a project';
-            focus = 'project';
-            computeProjectSuggestions();
-            render();
-            return;
-          }
-          const trimmedText = textInput.value.trim();
-          if (!trimmedText) {
-            message = 'Task text is required';
-            focus = 'text';
-            render();
-            return;
-          }
-          try {
-            wrapMetadata(metaInput.value); // validate
-          } catch (e) {
-            message = e instanceof Error ? e.message : String(e);
+          const applied = applyTextInputKey(metaInput, name);
+          if (applied) {
+            metaInput = applied.state;
             updateMetaAutocomplete();
             render();
             return;
           }
-          term.removeListener('key', handler);
-          setCursorVisible(term, false);
-          resolve({
-            projectId: projectSelected,
-            sectionId: headerSelected,
-            text: trimmedText,
-            metadataInner: metaInput.value.trim(),
-          });
-          return;
         }
-      }
-
-      if (focus === 'project') {
-        if (projectSelected) {
-          // Any edit action clears selection and enters filter mode.
-          const isEditKey =
-            name === 'BACKSPACE' ||
-            name === 'DELETE' ||
-            name === 'DEL' ||
-            name === 'CTRL_D' ||
-            name === 'ALT_BACKSPACE' ||
-            name === 'META_BACKSPACE' ||
-            name === 'CTRL_W' ||
-            name === 'CTRL_U' ||
-            name === 'CMD_BACKSPACE' ||
-            name === 'CTRL_K' ||
-            isSpaceKeyName(name) ||
-            name.length === 1;
-
-          if (!isEditKey) return;
-
-          projectSelected = null;
-          projectQueryInput = createTextInput('');
-          headerSelected = null;
-          headerQueryInput = createTextInput('');
-        }
-
-        const applied = applyTextInputKey(projectQueryInput, name);
-        if (applied) {
-          projectQueryInput = applied.state;
-          if (applied.didChangeValue) projectList.selectedIndex = 0;
-          computeProjectSuggestions();
-          render();
-          return;
-        }
-        return;
-      }
-
-      if (focus === 'header') {
-        if (!projectSelected) {
-          message = 'Choose a project';
-          focus = 'project';
-          computeProjectSuggestions();
-          render();
-          return;
-        }
-
-        if (headerSelected) {
-          const isEditKey =
-            name === 'BACKSPACE' ||
-            name === 'DELETE' ||
-            name === 'DEL' ||
-            name === 'CTRL_D' ||
-            name === 'ALT_BACKSPACE' ||
-            name === 'META_BACKSPACE' ||
-            name === 'CTRL_W' ||
-            name === 'CTRL_U' ||
-            name === 'CMD_BACKSPACE' ||
-            name === 'CTRL_K' ||
-            isSpaceKeyName(name) ||
-            name.length === 1;
-
-          if (!isEditKey) return;
-
-          headerSelected = null;
-          headerQueryInput = createTextInput('');
-        }
-
-        const applied = applyTextInputKey(headerQueryInput, name);
-        if (applied) {
-          headerQueryInput = applied.state;
-          if (applied.didChangeValue) headerList.selectedIndex = 0;
-          computeHeaderSuggestions();
-          render();
-          return;
-        }
-        return;
-      }
-
-      if (focus === 'text') {
-        const applied = applyTextInputKey(textInput, name);
-        if (applied) {
-          textInput = applied.state;
-          render();
-          return;
-        }
-        return;
-      }
-
-      if (focus === 'meta') {
-        const applied = applyTextInputKey(metaInput, name);
-        if (applied) {
-          metaInput = applied.state;
-          updateMetaAutocomplete();
-          render();
-          return;
-        }
-      }
-    };
-    term.on('key', handler);
+      };
+      term.on('key', handler);
     }
   );
 }

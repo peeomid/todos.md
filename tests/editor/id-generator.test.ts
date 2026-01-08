@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { generateNextId, getExistingIdsForProject } from '../../src/editor/id-generator.js';
 
 describe('generateNextId', () => {

@@ -1,10 +1,10 @@
 import fs from 'node:fs';
+import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { buildIndex } from '../indexer/index.js';
 import { writeIndexFile } from '../indexer/index-file.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
-import { boldText, dimText, greenText, yellowText } from './terminal.js';
 import { FileNotFoundError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractRepeatableFlags } from './flag-utils.js';
+import { boldText, dimText, greenText, yellowText } from './terminal.js';
 
 interface IndexOptions {
   files: string[];
@@ -19,21 +19,13 @@ export function handleIndexCommand(args: string[]): void {
 }
 
 function parseIndexFlags(args: string[]): IndexOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--quiet',
-    '-q',
-    '--json',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--quiet', '-q', '--json', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--output', '-o', '--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);
@@ -102,7 +94,7 @@ function runIndex(options: IndexOptions): void {
   if (!quiet) {
     console.log('');
     console.log(
-      `Found ${boldText(String(stats.projects))} projects, ${boldText(String(stats.tasks.total))} tasks (${greenText(String(stats.tasks.open) + ' open')}, ${dimText(String(stats.tasks.done) + ' done')})`
+      `Found ${boldText(String(stats.projects))} projects, ${boldText(String(stats.tasks.total))} tasks (${greenText(`${String(stats.tasks.open)} open`)}, ${dimText(`${String(stats.tasks.done)} done`)})`
     );
     console.log(`Written to: ${boldText(output)}`);
   }

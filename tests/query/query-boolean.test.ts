@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseQueryToFilterGroups, buildFilterGroups, composeFilterGroups } from '../../src/query/filters.js';
+import { describe, expect, it } from 'vitest';
+import { buildFilterGroups, composeFilterGroups, parseQueryToFilterGroups } from '../../src/query/filters.js';
 import type { Task } from '../../src/schema/index.js';
 
 function createTask(overrides: Partial<Task> = {}): Task {
@@ -21,21 +21,12 @@ function createTask(overrides: Partial<Task> = {}): Task {
 
 describe('parseQueryToFilterGroups', () => {
   it('supports pipe OR', () => {
-    expect(parseQueryToFilterGroups('bucket:today | plan:today')).toEqual([
-      ['bucket:today'],
-      ['plan:today'],
-    ]);
+    expect(parseQueryToFilterGroups('bucket:today | plan:today')).toEqual([['bucket:today'], ['plan:today']]);
   });
 
   it('supports OR keyword (case-insensitive)', () => {
-    expect(parseQueryToFilterGroups('bucket:today OR plan:today')).toEqual([
-      ['bucket:today'],
-      ['plan:today'],
-    ]);
-    expect(parseQueryToFilterGroups('bucket:today or plan:today')).toEqual([
-      ['bucket:today'],
-      ['plan:today'],
-    ]);
+    expect(parseQueryToFilterGroups('bucket:today OR plan:today')).toEqual([['bucket:today'], ['plan:today']]);
+    expect(parseQueryToFilterGroups('bucket:today or plan:today')).toEqual([['bucket:today'], ['plan:today']]);
   });
 
   it('supports grouping with AND outside parentheses', () => {
@@ -46,7 +37,9 @@ describe('parseQueryToFilterGroups', () => {
   });
 
   it('supports nested grouping', () => {
-    const groups = parseQueryToFilterGroups('project:inbox (bucket:today | plan:today) (priority:high | priority:normal)');
+    const groups = parseQueryToFilterGroups(
+      'project:inbox (bucket:today | plan:today) (priority:high | priority:normal)'
+    );
     expect(groups).toHaveLength(4);
     expect(groups).toContainEqual(['project:inbox', 'bucket:today', 'priority:high']);
     expect(groups).toContainEqual(['project:inbox', 'bucket:today', 'priority:normal']);
@@ -55,10 +48,7 @@ describe('parseQueryToFilterGroups', () => {
   });
 
   it('splits OR tokens without spaces', () => {
-    expect(parseQueryToFilterGroups('bucket:today|plan:today')).toEqual([
-      ['bucket:today'],
-      ['plan:today'],
-    ]);
+    expect(parseQueryToFilterGroups('bucket:today|plan:today')).toEqual([['bucket:today'], ['plan:today']]);
   });
 
   it('ignores unknown tokens outside filter syntax', () => {

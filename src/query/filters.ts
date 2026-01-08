@@ -5,15 +5,11 @@
  * filter semantics as `tmd list`.
  */
 
-import type { Task, Energy, Priority } from '../schema/index.js';
-import { parseDateSpec, isDateInRange, isOverdue } from '../cli/date-utils.js';
+import { isDateInRange, isOverdue, parseDateSpec } from '../cli/date-utils.js';
+import type { Energy, Priority, Task } from '../schema/index.js';
 
 export type TaskFilter = (task: Task) => boolean;
-type QueryToken =
-  | { type: 'filter'; value: string }
-  | { type: 'or' }
-  | { type: 'lparen' }
-  | { type: 'rparen' };
+type QueryToken = { type: 'filter'; value: string } | { type: 'or' } | { type: 'lparen' } | { type: 'rparen' };
 
 type QueryNode =
   | { type: 'filter'; value: string }
@@ -485,10 +481,7 @@ export function groupHasFilterKey(group: string[], key: string): boolean {
   return group.some((token) => parseFilterArg(token)?.key === key);
 }
 
-export function applyDefaultStatusToGroups(
-  groups: string[][],
-  status: 'open' | 'done' | 'all'
-): string[][] {
+export function applyDefaultStatusToGroups(groups: string[][], status: 'open' | 'done' | 'all'): string[][] {
   const base = groups.length > 0 ? groups : [[]];
   return base.map((group) => (groupHasFilterKey(group, 'status') ? group : [...group, `status:${status}`]));
 }
@@ -553,8 +546,8 @@ function compareBySortField(a: Task, b: Task, sortBy: SortField): number {
       return aOrder - bOrder;
     }
     case 'priority': {
-      const aOrder = a.priority ? PRIORITY_ORDER[a.priority] ?? 4 : 4;
-      const bOrder = b.priority ? PRIORITY_ORDER[b.priority] ?? 4 : 4;
+      const aOrder = a.priority ? (PRIORITY_ORDER[a.priority] ?? 4) : 4;
+      const bOrder = b.priority ? (PRIORITY_ORDER[b.priority] ?? 4) : 4;
       return aOrder - bOrder;
     }
     case 'bucket': {

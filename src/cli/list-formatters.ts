@@ -2,8 +2,8 @@
  * Output formatters for the list command
  */
 
-import type { Task, TaskIndex, Project } from '../schema/index.js';
-import { boldText, dimText, greenText, cyanText } from './terminal.js';
+import type { Task, TaskIndex } from '../schema/index.js';
+import { boldText, cyanText, dimText, greenText } from './terminal.js';
 
 export type FormatStyle = 'compact' | 'full' | 'markdown';
 
@@ -241,9 +241,7 @@ export function formatJson(tasks: Task[], payload: ListFilterPayload): string {
       childrenIds: task.childrenIds,
     })),
     summary,
-    filters: Object.fromEntries(
-      Object.entries(payload.filters).filter(([, v]) => v !== undefined)
-    ),
+    filters: Object.fromEntries(Object.entries(payload.filters).filter(([, v]) => v !== undefined)),
     filterGroups: payload.filterGroups,
     query: payload.query,
   };

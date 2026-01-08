@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import { lintFiles, type LintIssue } from '../linter/index.js';
 import { getGlobalConfigPath, loadConfig, resolveFiles } from '../config/loader.js';
-import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
-import { boldText, dimText, redText, yellowText, cyanText } from './terminal.js';
+import { type LintIssue, lintFiles } from '../linter/index.js';
 import { FileNotFoundError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractRepeatableFlags } from './flag-utils.js';
+import { boldText, cyanText, dimText, redText, yellowText } from './terminal.js';
 
 interface LintOptions {
   files: string[];
@@ -19,22 +19,13 @@ export function handleLintCommand(args: string[]): void {
 }
 
 function parseLintFlags(args: string[]): LintOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--fix',
-    '--quiet',
-    '-q',
-    '--json',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--fix', '--quiet', '-q', '--json', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);
@@ -66,7 +57,7 @@ function runLint(options: LintOptions): number {
       if (!fileIssues[issue.file]) {
         fileIssues[issue.file] = [];
       }
-      fileIssues[issue.file]!.push(issue);
+      fileIssues[issue.file]?.push(issue);
     }
 
     console.log(
@@ -117,8 +108,7 @@ function runLint(options: LintOptions): number {
   for (const [file, fileIssues] of issuesByFile) {
     console.log(boldText(file));
     for (const issue of fileIssues) {
-      const severityColor =
-        issue.severity === 'error' ? redText : issue.severity === 'warning' ? yellowText : dimText;
+      const severityColor = issue.severity === 'error' ? redText : issue.severity === 'warning' ? yellowText : dimText;
       const prefix = severityColor(`  Line ${issue.line}: ${issue.severity}:`);
       console.log(`${prefix} ${issue.message} ${dimText(`(${issue.rule})`)}`);
     }

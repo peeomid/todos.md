@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue } from '../types.js';
+import type { LintContext, LintIssue, LintRule } from '../types.js';
 
 // Flexible estimate format: 15m, 30m, 1h, 1.5h, 90m, 1h30m, etc.
 const ESTIMATE_REGEX = /^(\d+(\.\d+)?h)?(\d+m)?$/;

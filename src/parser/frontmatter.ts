@@ -37,8 +37,7 @@ export function parseFrontmatter(content: string): { frontmatter: Frontmatter; c
     }
   }
 
-  const taskFormatVersion =
-    typeof raw.task_format_version === 'number' ? raw.task_format_version : undefined;
+  const taskFormatVersion = typeof raw.task_format_version === 'number' ? raw.task_format_version : undefined;
 
   return {
     frontmatter: { taskFormatVersion, raw },

@@ -81,11 +81,7 @@ export function findTmdBlocks(content: string): TmdBlock[] {
 /**
  * Replace the content of a tmd block
  */
-export function replaceBlockContent(
-  content: string,
-  block: TmdBlock,
-  newContent: string
-): string {
+export function replaceBlockContent(content: string, block: TmdBlock, newContent: string): string {
   const lines = content.split('\n');
 
   // Lines between start and end (exclusive)

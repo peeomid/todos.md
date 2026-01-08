@@ -26,4 +26,3 @@ describe('tui layout', () => {
     expect(panelHintRowWithPanel).toBeLessThanOrEqual(termHeight);
   });
 });
-

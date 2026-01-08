@@ -3,16 +3,16 @@
  */
 
 import fs from 'node:fs';
+import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { greenText, dimText } from './terminal.js';
-import { parseRelativeDate } from './date-utils.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
 import type { Task } from '../schema/index.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
+import { parseRelativeDate } from './date-utils.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
+import { greenText } from './terminal.js';
 
 interface EditOptions {
   globalId: string;
@@ -53,13 +53,7 @@ export function handleEditCommand(args: string[]): void {
 }
 
 function parseEditFlags(args: string[]): EditOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--json',
-    '--no-reindex',
-    '--no-sync',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--no-reindex', '--no-sync', '--global-config', '-G']);
 
   const valueFlags = extractFlags(args, [
     '--energy',
@@ -80,9 +74,7 @@ function parseEditFlags(args: string[]): EditOptions {
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);
@@ -96,9 +88,7 @@ function parseEditFlags(args: string[]): EditOptions {
 
   // Validate ID format (should contain ':')
   if (!globalId.includes(':')) {
-    throw new CliUsageError(
-      `Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`
-    );
+    throw new CliUsageError(`Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`);
   }
 
   // Collect changes

@@ -1,11 +1,11 @@
+import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
+import { markTaskUndone } from '../editor/task-editor.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
-import { markTaskUndone } from '../editor/task-editor.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { yellowText } from './terminal.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
+import { yellowText } from './terminal.js';
 
 interface UndoneOptions {
   globalId: string;
@@ -54,20 +54,12 @@ Examples:
 }
 
 function parseUndoneFlags(args: string[]): UndoneOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--json',
-    '--no-reindex',
-    '--no-sync',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--no-reindex', '--no-sync', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);
@@ -81,9 +73,7 @@ function parseUndoneFlags(args: string[]): UndoneOptions {
 
   // Validate ID format (should contain ':')
   if (!globalId.includes(':')) {
-    throw new CliUsageError(
-      `Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`
-    );
+    throw new CliUsageError(`Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`);
   }
 
   return {

@@ -1,12 +1,12 @@
+import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
+import { markTaskDone } from '../editor/task-editor.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
-import { markTaskDone, type EditResult } from '../editor/task-editor.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { dimText, greenText } from './terminal.js';
-import { runAutoSyncIfNeeded } from './auto-sync.js';
 import type { Task, TaskIndex } from '../schema/index.js';
+import { runAutoSyncIfNeeded } from './auto-sync.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
+import { dimText, greenText } from './terminal.js';
 
 interface DoneOptions {
   globalId: string;
@@ -61,20 +61,12 @@ Examples:
 }
 
 function parseDoneFlags(args: string[]): DoneOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--json',
-    '--no-reindex',
-    '--no-sync',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--no-reindex', '--no-sync', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);
@@ -88,9 +80,7 @@ function parseDoneFlags(args: string[]): DoneOptions {
 
   // Validate ID format (should contain ':')
   if (!globalId.includes(':')) {
-    throw new CliUsageError(
-      `Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`
-    );
+    throw new CliUsageError(`Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`);
   }
 
   return {

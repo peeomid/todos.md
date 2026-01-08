@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  type Config,
   ConfigSchema,
   findConfigPath,
   getDefaultProjectConfigPath,
   getGlobalConfigPath,
   loadConfig,
-  type Config,
 } from '../config/loader.js';
-import { extractBooleanFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
+import { extractBooleanFlags } from './flag-utils.js';
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
@@ -124,14 +124,10 @@ function runConfigInit(args: string[]): void {
     throw new CliUsageError(`Unexpected arguments: ${args.join(' ')}`);
   }
 
-  const targetPath = boolFlags.has('--global')
-    ? getGlobalConfigPath()
-    : getDefaultProjectConfigPath(process.cwd());
+  const targetPath = boolFlags.has('--global') ? getGlobalConfigPath() : getDefaultProjectConfigPath(process.cwd());
 
   if (fs.existsSync(targetPath) && !boolFlags.has('--force')) {
-    throw new CliUsageError(
-      `Config already exists at ${targetPath}. Use --force to overwrite.`
-    );
+    throw new CliUsageError(`Config already exists at ${targetPath}. Use --force to overwrite.`);
   }
 
   ensureParentDir(targetPath);
@@ -141,7 +137,7 @@ function runConfigInit(args: string[]): void {
     output: 'todos.json',
   });
 
-  fs.writeFileSync(targetPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  fs.writeFileSync(targetPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8');
 
   if (boolFlags.has('--json')) {
     console.log(
@@ -191,9 +187,7 @@ function runConfigSet(args: string[]): void {
   const key = args[0]!;
   const rawValue = args[1]!;
 
-  const targetPath = boolFlags.has('--global')
-    ? getGlobalConfigPath()
-    : getDefaultProjectConfigPath(process.cwd());
+  const targetPath = boolFlags.has('--global') ? getGlobalConfigPath() : getDefaultProjectConfigPath(process.cwd());
 
   const existing = fs.existsSync(targetPath) ? loadConfig(targetPath) : ConfigSchema.parse({});
   const jsonValue = parseValueForKey(key, rawValue);
@@ -201,7 +195,7 @@ function runConfigSet(args: string[]): void {
   const validated = ConfigSchema.parse(updated);
 
   ensureParentDir(targetPath);
-  fs.writeFileSync(targetPath, JSON.stringify(validated, null, 2) + '\n', 'utf-8');
+  fs.writeFileSync(targetPath, `${JSON.stringify(validated, null, 2)}\n`, 'utf-8');
 
   if (boolFlags.has('--json')) {
     console.log(JSON.stringify({ success: true, key, value: jsonValue, path: targetPath }, null, 2));
@@ -364,7 +358,10 @@ function parseValueForKey(key: string, raw: string): JsonValue {
 
   // Convenience: comma-separated for common list keys
   if (key === 'files' || key === 'views') {
-    return trimmed.split(',').map((v) => v.trim()).filter(Boolean);
+    return trimmed
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
   }
 
   return trimmed;

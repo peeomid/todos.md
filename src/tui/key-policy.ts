@@ -12,4 +12,3 @@ export function shouldAllowGlobalQuit(params: {
   if (params.projectsFilterActive) return false;
   return true;
 }
-

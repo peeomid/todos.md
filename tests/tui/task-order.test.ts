@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { orderTasksForTreeView } from '../../src/tui/task-order.js';
+import { describe, expect, it } from 'vitest';
 import type { Task } from '../../src/schema/index.js';
+import { orderTasksForTreeView } from '../../src/tui/task-order.js';
 
 function createTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -58,4 +58,3 @@ describe('orderTasksForTreeView', () => {
     expect(out.map((t) => t.globalId)).toEqual(['p:2', 'p:2.1', 'p:1']);
   });
 });
-

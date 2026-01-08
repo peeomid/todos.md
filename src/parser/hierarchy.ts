@@ -1,4 +1,4 @@
-import type { ParsedFile, ParsedTask, TaskWithHierarchy } from './types.js';
+import type { ParsedFile, TaskWithHierarchy } from './types.js';
 
 export function buildHierarchy(parsedFile: ParsedFile): TaskWithHierarchy[] {
   const { projects, tasks } = parsedFile;

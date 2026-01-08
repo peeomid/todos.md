@@ -1,4 +1,4 @@
-import { supportsAnsiColor, boldText, dimText } from './terminal.js';
+import { boldText, dimText, supportsAnsiColor } from './terminal.js';
 
 export type HelpTopicId = 'topics' | 'concepts' | 'config' | 'workflows' | 'shorthands' | 'format';
 
@@ -180,14 +180,7 @@ export const HELP_TOPICS: Record<Exclude<HelpTopicId, 'topics'>, TopicDef> = {
 
 export function printHelpTopicsIndex(): void {
   const topicLines = Object.values(HELP_TOPICS).map((t) => `  ${t.id.padEnd(10)} ${t.summary}`);
-  const lines = [
-    heading('Help topics'),
-    ...topicLines,
-    '',
-    'Usage:',
-    '  tmd help <topic>',
-    '  tmd help topics',
-  ];
+  const lines = [heading('Help topics'), ...topicLines, '', 'Usage:', '  tmd help <topic>', '  tmd help topics'];
   console.log(lines.join('\n'));
 }
 

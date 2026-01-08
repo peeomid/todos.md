@@ -61,8 +61,8 @@ export function renderAutocompleteSuggestionsBox(
     const isSelected = index === selectedIndex;
     const arrow = isSelected ? '▶' : ' ';
 
-    if (isSelected) style.cyan(arrow + ' ');
-    else style.dim(arrow + ' ');
+    if (isSelected) style.cyan(`${arrow} `);
+    else style.dim(`${arrow} `);
 
     const mainText = suggestion.display.padEnd(14);
     if (isSelected) style.selectedBg(mainText);
@@ -88,4 +88,3 @@ export function renderAutocompleteSuggestionsBox(
     style.dim(hintWhenNoMore ?? '  ↑↓ navigate · Tab apply · Esc cancel');
   }
 }
-

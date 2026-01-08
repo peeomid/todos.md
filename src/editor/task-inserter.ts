@@ -43,7 +43,9 @@ export function buildTaskLine(text: string, metadata: TaskMetadata, indentLevel:
 
   const ordered: Record<string, string> = {};
   ordered.id = metadata.id;
-  for (const key of Object.keys(meta).filter((k) => k !== 'id').sort()) {
+  for (const key of Object.keys(meta)
+    .filter((k) => k !== 'id')
+    .sort()) {
     const value = meta[key];
     if (value) {
       ordered[key] = value;
@@ -92,11 +94,7 @@ export function findTopLevelInsertionPoint(
  * @param tasks - All tasks in the index
  * @returns The line number (1-indexed) after which to insert
  */
-export function findSubtaskInsertionPoint(
-  lines: string[],
-  parentTask: Task,
-  tasks: Record<string, Task>
-): number {
+export function findSubtaskInsertionPoint(lines: string[], parentTask: Task, tasks: Record<string, Task>): number {
   // Find all direct children of this parent
   const children = parentTask.childrenIds
     .map((id) => tasks[id])
@@ -186,7 +184,12 @@ export function insertTaskAfterTaskSameLevel(
   return insertTaskLine(filePath, afterLine, taskLine);
 }
 
-export function insertTaskUnderSection(index: TaskIndex, sectionId: string, text: string, metadata: TaskMetadata): InsertResult {
+export function insertTaskUnderSection(
+  index: TaskIndex,
+  sectionId: string,
+  text: string,
+  metadata: TaskMetadata
+): InsertResult {
   const section = index.sections[sectionId];
   if (!section) {
     return { success: false, error: `Section '${sectionId}' not found.` };
@@ -260,7 +263,7 @@ export function insertTaskUnderSection(index: TaskIndex, sectionId: string, text
 function getIndentLevel(line: string): number {
   const match = line.match(/^(\s*)/);
   if (!match) return 0;
-  return Math.floor(match[1]!.length / 2);
+  return Math.floor((match[1]?.length ?? 0) / 2);
 }
 
 /**

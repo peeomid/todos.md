@@ -2,14 +2,14 @@
  * tmd stats - Task statistics and completion metrics
  */
 
-import { readIndexFile } from '../indexer/index-file.js';
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { boldText, dimText, greenText, cyanText } from './terminal.js';
-import { parseQueryToFilterGroups, buildFilterGroups, composeFilterGroups } from './list-filters.js';
-import { parseDateSpec, formatDate, isOverdue } from './date-utils.js';
+import { readIndexFile } from '../indexer/index-file.js';
 import type { Task, TaskIndex } from '../schema/index.js';
+import { formatDate, isOverdue, parseDateSpec } from './date-utils.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
+import { buildFilterGroups, composeFilterGroups, parseQueryToFilterGroups } from './list-filters.js';
+import { boldText, cyanText, dimText, greenText } from './terminal.js';
 
 type Period = 'today' | 'last-7d' | 'last-30d' | 'this-week';
 type GroupBy = 'project' | 'area' | 'bucket' | 'energy';
@@ -58,19 +58,10 @@ export function handleStatsCommand(args: string[]): void {
 function parseStatsFlags(args: string[]): StatsOptions {
   const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
 
-  const valueFlags = extractFlags(args, [
-    '--period',
-    '--by',
-    '--config',
-    '-c',
-    '--output',
-    '-o',
-  ]);
+  const valueFlags = extractFlags(args, ['--period', '--by', '--config', '-c', '--output', '-o']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
@@ -130,7 +121,7 @@ function runStats(options: StatsOptions): void {
   printStats(stats, options.period);
 }
 
-function calculateStats(tasks: Task[], index: TaskIndex, period: Period): StatsResult {
+function calculateStats(tasks: Task[], _index: TaskIndex, period: Period): StatsResult {
   const today = new Date();
   const todayStr = formatDate(today);
 
@@ -189,13 +180,9 @@ function calculateStats(tasks: Task[], index: TaskIndex, period: Period): StatsR
   const last7Days = getLastNDays(7);
   const last30Days = getLastNDays(30);
 
-  const completedLast7d = tasks.filter(
-    (t) => t.completed && t.updated && last7Days.includes(t.updated)
-  ).length;
+  const completedLast7d = tasks.filter((t) => t.completed && t.updated && last7Days.includes(t.updated)).length;
 
-  const completedLast30d = tasks.filter(
-    (t) => t.completed && t.updated && last30Days.includes(t.updated)
-  ).length;
+  const completedLast30d = tasks.filter((t) => t.completed && t.updated && last30Days.includes(t.updated)).length;
 
   // By day (last 7 days)
   const byDay: Record<string, number> = {};

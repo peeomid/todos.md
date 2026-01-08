@@ -57,11 +57,7 @@ export function parseDate(dateStr: string): Date | null {
   const [, year, month, day] = match;
   const date = new Date(Number(year), Number(month) - 1, Number(day));
   // Validate the date is real (e.g., not Feb 30)
-  if (
-    date.getFullYear() !== Number(year) ||
-    date.getMonth() !== Number(month) - 1 ||
-    date.getDate() !== Number(day)
-  ) {
+  if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) {
     return null;
   }
   return date;
@@ -88,7 +84,7 @@ export function parseRelativeDate(spec: string): string {
   const relativeMatch = spec.match(/^\+(\d+)([dw])$/i);
   if (relativeMatch) {
     const amount = Number(relativeMatch[1]);
-    const unit = relativeMatch[2]!.toLowerCase();
+    const unit = relativeMatch[2]?.toLowerCase();
     const result = new Date(today);
     result.setDate(result.getDate() + (unit === 'w' ? amount * 7 : amount));
     return formatDate(result);

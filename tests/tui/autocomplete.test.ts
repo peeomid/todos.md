@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applySuggestion,
-  generateSuggestions,
-  getAutocompleteContext,
-} from '../../src/tui/autocomplete.js';
+import { applySuggestion, generateSuggestions, getAutocompleteContext } from '../../src/tui/autocomplete.js';
 
 describe('tui autocomplete', () => {
   it('suggests bucket: for partial key input', () => {
@@ -47,4 +43,3 @@ describe('tui autocomplete', () => {
     expect(newCursorPos).toBe(newInput.length);
   });
 });
-

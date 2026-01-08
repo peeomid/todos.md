@@ -99,14 +99,17 @@ export function applyTextInputKey(
   // Basic movement
   if (name === 'LEFT' || name === 'CTRL_B') return finish(withCursor(normalized, prevCursor - 1));
   if (name === 'RIGHT' || name === 'CTRL_F') return finish(withCursor(normalized, prevCursor + 1));
-  if (name === 'HOME' || name === 'CTRL_A' || name === 'META_LEFT' || name === 'CMD_LEFT') return finish(withCursor(normalized, 0));
+  if (name === 'HOME' || name === 'CTRL_A' || name === 'META_LEFT' || name === 'CMD_LEFT')
+    return finish(withCursor(normalized, 0));
   if (name === 'END' || name === 'CTRL_E' || name === 'META_RIGHT' || name === 'CMD_RIGHT') {
     return finish(withCursor(normalized, toChars(normalized.value).length));
   }
 
   // Word movement (common on macOS terminals and readline-style UIs)
-  if (name === 'ALT_LEFT' || name === 'CTRL_LEFT' || name === 'ALT_B' || name === 'META_B') return finish(moveWordLeft(normalized));
-  if (name === 'ALT_RIGHT' || name === 'CTRL_RIGHT' || name === 'ALT_F' || name === 'META_F') return finish(moveWordRight(normalized));
+  if (name === 'ALT_LEFT' || name === 'CTRL_LEFT' || name === 'ALT_B' || name === 'META_B')
+    return finish(moveWordLeft(normalized));
+  if (name === 'ALT_RIGHT' || name === 'CTRL_RIGHT' || name === 'ALT_F' || name === 'META_F')
+    return finish(moveWordRight(normalized));
 
   // Deletion
   if (name === 'BACKSPACE') {

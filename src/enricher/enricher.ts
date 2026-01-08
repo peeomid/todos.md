@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
-import { parseShorthands, hasShorthands } from './shorthand-parser.js';
 import { generateNextId } from './id-generator.js';
-import type { EnrichOptions, EnrichChange, EnrichFileResult, EnrichResult } from './types.js';
+import { parseShorthands } from './shorthand-parser.js';
+import type { EnrichChange, EnrichFileResult, EnrichOptions, EnrichResult } from './types.js';
 
 const TASK_REGEX = /^(\s*)- \[([ xX])\]\s+(.+)$/;
 const PROJECT_HEADING_REGEX = /^(#{1,6})\s+.+\[.*project:([^\s\]]+)/;
@@ -93,14 +93,14 @@ export function enrichContent(content: string, filePath: string, options: Enrich
       continue;
     }
 
-    const [fullMatch, indent, checkbox, taskContent] = taskMatch;
+    const [_fullMatch, indent, checkbox, taskContent] = taskMatch;
     // Note: indent can be empty string for top-level tasks, which is valid
     if (indent === undefined || !checkbox || !taskContent) {
       modifiedLines.push(line);
       continue;
     }
 
-    const { metadata, textWithoutMetadata, hasMetadata } = parseMetadataBlock(taskContent);
+    const { metadata, textWithoutMetadata } = parseMetadataBlock(taskContent);
     const added: string[] = [];
     const currentIndentWidth = measureIndentWidth(indent);
 
@@ -112,7 +112,7 @@ export function enrichContent(content: string, filePath: string, options: Enrich
     }
 
     // Determine parent based on indentation.
-    while (taskStack.length > 0 && taskStack[taskStack.length - 1]!.indentWidth >= currentIndentWidth) {
+    while (taskStack.length > 0 && (taskStack[taskStack.length - 1]?.indentWidth ?? -1) >= currentIndentWidth) {
       taskStack.pop();
     }
     const isTopLevel = currentIndentWidth === baseIndentWidth;
@@ -122,7 +122,7 @@ export function enrichContent(content: string, filePath: string, options: Enrich
     const shorthandResult = parseShorthands(textWithoutMetadata, options.keepShorthands, today);
 
     // Determine final text (with or without shorthands)
-    let finalText = shorthandResult.cleanedText;
+    const finalText = shorthandResult.cleanedText;
 
     // Apply shorthand-derived values (only if not already set)
     if (shorthandResult.priority && !metadata.priority) {

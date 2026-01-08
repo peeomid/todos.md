@@ -1,5 +1,5 @@
-import { boldText, dimText, supportsAnsiColor } from './terminal.js';
 import { HELP_TOPICS } from './help-topics.js';
+import { boldText, dimText, supportsAnsiColor } from './terminal.js';
 
 export function printHelp(message?: string): void {
   if (message) {
@@ -7,9 +7,7 @@ export function printHelp(message?: string): void {
     console.error('');
   }
 
-  const title = supportsAnsiColor
-    ? `${boldText('tmd')} ${dimText('— Todo Markdown CLI')}`
-    : 'tmd — Todo Markdown CLI';
+  const title = supportsAnsiColor ? `${boldText('tmd')} ${dimText('— Todo Markdown CLI')}` : 'tmd — Todo Markdown CLI';
 
   const lines = [
     title,

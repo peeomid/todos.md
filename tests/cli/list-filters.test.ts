@@ -1,22 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  parseFilterArg,
-  parseFilterArgs,
-  filterByProject,
+  applyDefaultStatusToGroups,
+  buildFiltersFromOptions,
+  composeFilters,
   filterByArea,
-  filterByEnergy,
-  filterByPriority,
   filterByBucket,
-  filterByText,
+  filterByEnergy,
+  filterByParent,
+  filterByPriority,
+  filterByProject,
   filterByStatus,
   filterByTags,
-  filterByParent,
+  filterByText,
   filterTopLevel,
-  composeFilters,
-  applyDefaultStatusToGroups,
-  sortTasks,
   groupTasks,
-  buildFiltersFromOptions,
+  parseFilterArg,
+  parseFilterArgs,
+  sortTasks,
 } from '../../src/cli/list-filters.js';
 import type { Task } from '../../src/schema/index.js';
 
@@ -224,10 +224,7 @@ describe('individual filters', () => {
 
 describe('composeFilters', () => {
   it('combines multiple filters with AND logic', () => {
-    const filters = [
-      filterByProject('inbox'),
-      filterByEnergy('low'),
-    ];
+    const filters = [filterByProject('inbox'), filterByEnergy('low')];
     const composed = composeFilters(filters);
 
     expect(composed(createTask({ projectId: 'inbox', energy: 'low' }))).toBe(true);

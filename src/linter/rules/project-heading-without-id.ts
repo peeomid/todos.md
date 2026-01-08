@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue } from '../types.js';
+import type { LintContext, LintIssue, LintRule } from '../types.js';
 
 const HEADING_WITH_METADATA_REGEX = /^(#{1,6})\s+(.+)\s*\[([^\]]+)\]\s*$/;
 

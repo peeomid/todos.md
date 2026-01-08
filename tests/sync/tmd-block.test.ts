@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { findTmdBlocks, replaceBlockContent, parseTasksInBlock } from '../../src/sync/tmd-block.js';
+import { describe, expect, it } from 'vitest';
+import { findTmdBlocks, parseTasksInBlock, replaceBlockContent } from '../../src/sync/tmd-block.js';
 
 describe('findTmdBlocks', () => {
   it('finds a single block with query', () => {

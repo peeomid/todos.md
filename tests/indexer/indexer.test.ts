@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildIndex } from '../../src/indexer/indexer.js';
 
 const TEST_DIR = path.join(process.cwd(), 'tests', 'fixtures');

@@ -1,12 +1,12 @@
-import type { AreaHeading, SectionHeading, TaskIndex, Task, Project } from '../schema/index.js';
 import {
-  parseMarkdownFile,
   buildHierarchy,
-  type TaskWithHierarchy,
-  type ParsedProject,
   type ParsedAreaHeading,
+  type ParsedProject,
   type ParsedSectionHeading,
+  parseMarkdownFile,
+  type TaskWithHierarchy,
 } from '../parser/index.js';
+import type { AreaHeading, Project, SectionHeading, Task, TaskIndex } from '../schema/index.js';
 import type { IndexerResult, IndexStats, IndexWarning } from './types.js';
 
 export function buildIndex(filePaths: string[]): IndexerResult {
@@ -109,9 +109,7 @@ export function buildIndex(filePaths: string[]): IndexerResult {
     }
 
     // Convert children from localIds to globalIds
-    task.childrenIds = task.childrenIds
-      .map((localId) => `${task.projectId}:${localId}`)
-      .filter((gid) => tasks[gid]);
+    task.childrenIds = task.childrenIds.map((localId) => `${task.projectId}:${localId}`).filter((gid) => tasks[gid]);
   }
 
   const index: TaskIndex = {
@@ -164,7 +162,9 @@ function buildSections(parsedFile: {
       headingLevel: h.headingLevel,
       parentId: null,
     };
-    (byProject[projectId] ??= []).push(section);
+    const arr = byProject[projectId] ?? [];
+    arr.push(section);
+    byProject[projectId] = arr;
   }
 
   // Establish parent/child relationships per project (markdown heading nesting by level).
@@ -173,10 +173,10 @@ function buildSections(parsedFile: {
     const stack: Array<{ level: number; id: string }> = [];
 
     for (const s of list) {
-      while (stack.length > 0 && stack[stack.length - 1]!.level >= s.headingLevel) {
+      while (stack.length > 0 && (stack[stack.length - 1]?.level ?? -1) >= s.headingLevel) {
         stack.pop();
       }
-      s.parentId = stack.length > 0 ? stack[stack.length - 1]!.id : null;
+      s.parentId = stack.length > 0 ? (stack[stack.length - 1]?.id ?? null) : null;
       stack.push({ level: s.headingLevel, id: s.id });
     }
   }

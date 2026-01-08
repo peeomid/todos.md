@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ConfigSchema, getGlobalConfigPath, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { renderDailyViewScaffold, renderTodosScaffold } from '../templates/init.js';
+import { type Config, ConfigSchema, getGlobalConfigPath } from '../config/loader.js';
 import type { TaskIndex } from '../schema/index.js';
+import { renderDailyViewScaffold, renderTodosScaffold } from '../templates/init.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 
 interface InitOptions {
   file: string;
@@ -87,7 +87,7 @@ function runInit(options: InitOptions): void {
       views: [viewPath],
       defaults: { area: 'inbox', energy: 'normal' },
     });
-    plannedWrites.push({ path: configPath, contents: JSON.stringify(config, null, 2) + '\n' });
+    plannedWrites.push({ path: configPath, contents: `${JSON.stringify(config, null, 2)}\n` });
   }
 
   if (withIndex) {
@@ -100,7 +100,7 @@ function runInit(options: InitOptions): void {
       sections: {},
       tasks: {},
     };
-    plannedWrites.push({ path: output, contents: JSON.stringify(index, null, 2) + '\n' });
+    plannedWrites.push({ path: output, contents: `${JSON.stringify(index, null, 2)}\n` });
   }
 
   if (globalConfig) {
@@ -109,7 +109,7 @@ function runInit(options: InitOptions): void {
       files: ['todos.md'],
       output: 'todos.json',
     });
-    plannedWrites.push({ path: globalPath, contents: JSON.stringify(globalConfigData, null, 2) + '\n' });
+    plannedWrites.push({ path: globalPath, contents: `${JSON.stringify(globalConfigData, null, 2)}\n` });
   }
 
   const writesToApply = plannedWrites.filter((write) => {

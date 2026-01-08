@@ -5,7 +5,8 @@ const forceEnableColor =
 const hasNoColor = process.env.NO_COLOR !== undefined;
 const stdoutStream = process.stdout as NodeJS.WriteStream | undefined;
 
-export const supportsAnsiColor = !hasNoColor && (forceEnableColor || (!forceDisableColor && Boolean(stdoutStream?.isTTY)));
+export const supportsAnsiColor =
+  !hasNoColor && (forceEnableColor || (!forceDisableColor && Boolean(stdoutStream?.isTTY)));
 
 export function colorize(code: number, text: string): string {
   if (!supportsAnsiColor) {

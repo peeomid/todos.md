@@ -1,6 +1,6 @@
 import fs from 'node:fs';
-import type { Task } from '../schema/index.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
+import type { Task } from '../schema/index.js';
 
 const TASK_LINE_REGEX = /^(\s*)-\s*\[([ xX])\]\s+(.*)$/;
 
@@ -45,7 +45,13 @@ export async function runEditFlow(options: {
     colorsDisabled: boolean,
     options?: { enter?: string }
   ) => Promise<string | null>;
-  promptText: (term: any, title: string, label: string, initial: string, colorsDisabled: boolean) => Promise<string | null>;
+  promptText: (
+    term: any,
+    title: string,
+    label: string,
+    initial: string,
+    colorsDisabled: boolean
+  ) => Promise<string | null>;
 }): Promise<EditFlowResult> {
   const { term, task, colorsDisabled, showKeyMenu, promptText } = options;
   const readMetadataBlockString = options.readMetadataBlockString ?? readCurrentMetadataBlockString;
@@ -61,7 +67,13 @@ export async function runEditFlow(options: {
   if (!choice) return { ok: false, canceled: true };
 
   if (choice === 't') {
-    const nextText = await promptText(term, `Edit task text — ${task.globalId}`, 'Task text:', task.text, colorsDisabled);
+    const nextText = await promptText(
+      term,
+      `Edit task text — ${task.globalId}`,
+      'Task text:',
+      task.text,
+      colorsDisabled
+    );
     if (nextText === null) return { ok: false, canceled: true };
     const currentMeta = readMetadataBlockString(task);
     return { ok: true, text: nextText.trim(), metadataBlock: currentMeta.trim() };

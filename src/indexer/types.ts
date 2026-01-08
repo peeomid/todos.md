@@ -1,4 +1,4 @@
-import type { Task, TaskIndex, Project } from '../schema/index.js';
+import type { Project, Task, TaskIndex } from '../schema/index.js';
 
 export interface IndexerResult {
   index: TaskIndex;

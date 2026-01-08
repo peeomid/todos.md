@@ -1,4 +1,4 @@
-import type { ParsedFile, ParsedProject, ParsedTask } from '../parser/types.js';
+import type { ParsedFile } from '../parser/types.js';
 
 export type Severity = 'error' | 'warning' | 'info';
 

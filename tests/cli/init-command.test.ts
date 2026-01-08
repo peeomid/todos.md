@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
-import { handleInitCommand } from '../../src/cli/init-command.js';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CliUsageError } from '../../src/cli/errors.js';
+import { handleInitCommand } from '../../src/cli/init-command.js';
 
 let originalCwd: string;
 let tempDir: string;

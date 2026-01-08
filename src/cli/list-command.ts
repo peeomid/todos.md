@@ -4,29 +4,29 @@
  * Supports both old-style flags (--project, --energy) and new key:value syntax (project:id, energy:low)
  */
 
-import { readIndexFile } from '../indexer/index-file.js';
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
+import { readIndexFile } from '../indexer/index-file.js';
+import type { Task } from '../schema/index.js';
 import { CliUsageError } from './errors.js';
-import type { Task, Energy, Priority, TaskIndex } from '../schema/index.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import {
-  parseFilterArgs,
-  parseQueryToFilterGroups,
+  applyDefaultStatusToGroups,
   buildFilterGroups,
   composeFilterGroups,
-  applyDefaultStatusToGroups,
-  sortTasks,
-  groupTasks,
   type FilterOptions,
-  type SortField,
   type GroupField,
+  groupTasks,
+  parseFilterArgs,
+  parseQueryToFilterGroups,
+  type SortField,
+  sortTasks,
 } from './list-filters.js';
 import {
-  formatCompactGrouped,
+  type FormatStyle,
   formatCompactFlat,
+  formatCompactGrouped,
   formatFull,
   formatJson,
-  type FormatStyle,
 } from './list-formatters.js';
 
 interface ListOptions {
@@ -70,9 +70,7 @@ function parseListFlags(args: string[]): ListOptions {
   ]);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
@@ -116,7 +114,7 @@ function parseListFlags(args: string[]): ListOptions {
   let limit: number | undefined;
   if (limitRaw) {
     limit = parseInt(limitRaw, 10);
-    if (isNaN(limit) || limit < 1) {
+    if (Number.isNaN(limit) || limit < 1) {
       throw new CliUsageError(`Invalid limit: '${limitRaw}'. Must be a positive number.`);
     }
   }
@@ -248,7 +246,7 @@ export function printListHelp(): void {
     '  tmd list                          # List all open tasks',
     '  tmd list project:inbox            # Filter by project',
     '  tmd list energy:low               # Light tasks only',
-    '  tmd list bucket:today             # Today\'s tasks',
+    "  tmd list bucket:today             # Today's tasks",
     '  tmd list bucket:now               # Working right now',
     '  tmd list priority:high            # High priority tasks',
     '  tmd list due:today                # Due today',

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { deleteTaskSubtree } from '../../src/editor/task-deleter.js';
 
 function writeTempFile(content: string): { dir: string; filePath: string } {
@@ -56,4 +56,3 @@ describe('deleteTaskSubtree', () => {
     expect(out).toBe(`- [ ] Task A [id:1]\n`);
   });
 });
-

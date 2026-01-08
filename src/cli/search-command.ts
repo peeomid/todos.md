@@ -4,23 +4,22 @@
  * Thin wrapper over `tmd list` with implicit `text:` filter
  */
 
-import { readIndexFile } from '../indexer/index-file.js';
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
+import { readIndexFile } from '../indexer/index-file.js';
 import { CliUsageError } from './errors.js';
-import type { Task } from '../schema/index.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import {
-  parseFilterArgs,
-  composeFilters,
-  parseQueryToFilterGroups,
+  applyDefaultStatusToGroups,
   buildFilterGroups,
   composeFilterGroups,
-  applyDefaultStatusToGroups,
-  filterByText,
-  sortTasks,
+  composeFilters,
   type FilterOptions,
+  filterByText,
+  parseFilterArgs,
+  parseQueryToFilterGroups,
+  sortTasks,
 } from './list-filters.js';
-import { type FormatStyle } from './list-formatters.js';
+import type { FormatStyle } from './list-formatters.js';
 import { cyanText, dimText } from './terminal.js';
 
 interface SearchOptions {
@@ -40,19 +39,10 @@ export function handleSearchCommand(args: string[]): void {
 function parseSearchFlags(args: string[]): SearchOptions {
   const boolFlags = extractBooleanFlags(args, ['--json', '--global-config', '-G']);
 
-  const valueFlags = extractFlags(args, [
-    '--format',
-    '-f',
-    '--config',
-    '-c',
-    '--output',
-    '-o',
-  ]);
+  const valueFlags = extractFlags(args, ['--format', '-f', '--config', '-c', '--output', '-o']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
@@ -115,9 +105,7 @@ function runSearch(options: SearchOptions): void {
   if (options.json) {
     const output = {
       query: options.searchText,
-      filters: Object.fromEntries(
-        Object.entries(options.filterOptions).filter(([, v]) => v !== undefined)
-      ),
+      filters: Object.fromEntries(Object.entries(options.filterOptions).filter(([, v]) => v !== undefined)),
       filterGroups: options.filterGroups,
       tasks: sortedTasks.map((task) => ({
         globalId: task.globalId,

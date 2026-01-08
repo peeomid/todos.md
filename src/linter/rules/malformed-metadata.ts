@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue } from '../types.js';
+import type { LintContext, LintIssue, LintRule } from '../types.js';
 
 const METADATA_BLOCK_REGEX = /\[([^\]]+)\]\s*$/;
 

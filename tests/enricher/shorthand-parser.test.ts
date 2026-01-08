@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseShorthands, hasShorthands } from '../../src/enricher/shorthand-parser.js';
+import { describe, expect, it } from 'vitest';
+import { hasShorthands, parseShorthands } from '../../src/enricher/shorthand-parser.js';
 
 describe('parseShorthands', () => {
   const today = '2025-12-10';

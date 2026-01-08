@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue } from '../types.js';
+import type { LintContext, LintIssue, LintRule } from '../types.js';
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_FIELDS = ['due', 'created', 'updated', 'plan'];

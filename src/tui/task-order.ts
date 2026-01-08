@@ -1,5 +1,5 @@
-import type { Task } from '../schema/index.js';
 import type { SortField } from '../query/filters.js';
+import type { Task } from '../schema/index.js';
 
 type PriorityOrderOverride = 'high-first' | 'low-first';
 

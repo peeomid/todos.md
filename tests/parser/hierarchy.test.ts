@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { parseMarkdownContent } from '../../src/parser/markdown-parser.js';
+import { describe, expect, it } from 'vitest';
 import { buildHierarchy } from '../../src/parser/hierarchy.js';
+import { parseMarkdownContent } from '../../src/parser/markdown-parser.js';
 
 describe('buildHierarchy', () => {
   it('assigns project IDs to tasks', () => {

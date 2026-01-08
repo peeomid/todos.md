@@ -53,4 +53,3 @@ describe('tui prompts', () => {
     await expect(p2).resolves.toBe(null);
   });
 });
-

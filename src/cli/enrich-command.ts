@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import { enrichFiles, type EnrichFileResult, type EnrichResult } from '../enricher/index.js';
 import { getGlobalConfigPath, loadConfig, resolveFiles } from '../config/loader.js';
-import { extractBooleanFlags, extractRepeatableFlags, extractFlags } from './flag-utils.js';
-import { boldText, dimText, cyanText, greenText } from './terminal.js';
+import { type EnrichResult, enrichFiles } from '../enricher/index.js';
 import { FileNotFoundError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractRepeatableFlags } from './flag-utils.js';
+import { boldText, cyanText, dimText, greenText } from './terminal.js';
 
 interface EnrichOptions {
   files: string[];
@@ -18,21 +18,13 @@ export function handleEnrichCommand(args: string[]): void {
 }
 
 function parseEnrichFlags(args: string[]): EnrichOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--keep-shorthands',
-    '--dry-run',
-    '--json',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--keep-shorthands', '--dry-run', '--json', '--global-config', '-G']);
   const valueFlags = extractFlags(args, ['--config', '-c']);
   const fileFlags = extractRepeatableFlags(args, '--file');
   const shortFileFlags = extractRepeatableFlags(args, '-f');
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
 
   const files = resolveFiles(config, [...fileFlags, ...shortFileFlags]);
@@ -111,9 +103,7 @@ function printTextOutput(result: EnrichResult, dryRun: boolean): void {
 
   // Summary
   const action = dryRun ? 'Would modify' : 'Modified';
-  console.log(
-    `${action} ${result.summary.totalTasksModified} task(s) in ${result.summary.filesModified} file(s)`
-  );
+  console.log(`${action} ${result.summary.totalTasksModified} task(s) in ${result.summary.filesModified} file(s)`);
 
   if (dryRun) {
     console.log(dimText('(dry run - no files modified)'));

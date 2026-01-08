@@ -1,7 +1,7 @@
 import fs from 'node:fs';
-import type { ParsedAreaHeading, ParsedFile, ParsedProject, ParsedSectionHeading, ParsedTask } from './types.js';
 import { parseFrontmatter } from './frontmatter.js';
 import { parseMetadataBlock } from './metadata-parser.js';
+import type { ParsedAreaHeading, ParsedFile, ParsedProject, ParsedSectionHeading, ParsedTask } from './types.js';
 
 const HEADING_REGEX = /^(#{1,6})\s+(.+)$/;
 const TASK_REGEX = /^(\s*)- \[([ xX])\]\s+(.+)$/;

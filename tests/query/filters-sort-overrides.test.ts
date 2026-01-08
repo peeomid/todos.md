@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { sortTasksByFields, sortTasksByFieldsWithOverrides } from '../../src/query/filters.js';
 import type { Task } from '../../src/schema/index.js';
 

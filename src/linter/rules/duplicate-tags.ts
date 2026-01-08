@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue, LintFix } from '../types.js';
+import type { LintContext, LintFix, LintIssue, LintRule } from '../types.js';
 
 export const duplicateTagsRule: LintRule = {
   name: 'duplicate-tags',

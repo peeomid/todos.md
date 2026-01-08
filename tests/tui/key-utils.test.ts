@@ -13,4 +13,3 @@ describe('isSpaceKeyName', () => {
     expect(isSpaceKeyName('')).toBe(false);
   });
 });
-

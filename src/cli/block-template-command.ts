@@ -2,8 +2,8 @@
  * tmd block-template - Generate sync block skeletons for copy-paste
  */
 
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 
 interface BlockTemplateOptions {
   query: string;

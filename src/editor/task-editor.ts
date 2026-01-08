@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
 
 export type TaskStatus = 'open' | 'done';
 
@@ -79,9 +80,16 @@ export function setTaskStatus(
     };
   }
 
+  const { metadata, textWithoutMetadata } = parseMetadataBlock(taskContent);
+  const today = new Date().toISOString().split('T')[0]!;
+  metadata.updated = today;
+
+  const metadataStr = serializeMetadata(orderMetadata(metadata));
+  const rebuiltContent = metadataStr ? `${textWithoutMetadata} ${metadataStr}` : textWithoutMetadata;
+
   // Update the line
   const newCheckbox = newStatus === 'done' ? '[x]' : '[ ]';
-  const newLine = `${indent}- ${newCheckbox} ${taskContent}`;
+  const newLine = `${indent}- ${newCheckbox} ${rebuiltContent}`;
   lines[lineIndex] = newLine;
 
   // Write file back
@@ -97,22 +105,14 @@ export function setTaskStatus(
 /**
  * Mark a task as done.
  */
-export function markTaskDone(
-  filePath: string,
-  lineNumber: number,
-  expectedText: string
-): EditResult {
+export function markTaskDone(filePath: string, lineNumber: number, expectedText: string): EditResult {
   return setTaskStatus(filePath, lineNumber, expectedText, 'done');
 }
 
 /**
  * Mark a task as undone (open).
  */
-export function markTaskUndone(
-  filePath: string,
-  lineNumber: number,
-  expectedText: string
-): EditResult {
+export function markTaskUndone(filePath: string, lineNumber: number, expectedText: string): EditResult {
   return setTaskStatus(filePath, lineNumber, expectedText, 'open');
 }
 
@@ -132,4 +132,24 @@ function textsMatch(a: string, b: string): boolean {
   const normalizeA = a.replace(/\s+/g, ' ').trim().toLowerCase();
   const normalizeB = b.replace(/\s+/g, ' ').trim().toLowerCase();
   return normalizeA === normalizeB;
+}
+
+function orderMetadata(metadata: Record<string, string>): Record<string, string> {
+  const ordered: Record<string, string> = {};
+
+  if (metadata.id) {
+    ordered.id = metadata.id;
+  }
+
+  const otherKeys = Object.keys(metadata)
+    .filter((k) => k !== 'id')
+    .sort();
+  for (const key of otherKeys) {
+    const value = metadata[key];
+    if (value) {
+      ordered[key] = value;
+    }
+  }
+
+  return ordered;
 }

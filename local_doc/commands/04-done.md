@@ -118,10 +118,11 @@ Task already done: as-onb:1.1 (Subject lines A/B test)
 3. Find the task line by line number
 4. Verify it's the expected task (safety check)
 5. Change `- [ ]` to `- [x]`
-6. **Cascade to children**: Find all descendant tasks and mark them as done too
-7. Write file back
-8. Re-run indexer to update `todos.json` (unless `--no-reindex`)
-9. **Auto-sync**: Run `tmd sync` on configured files (unless `--no-sync`)
+6. Update `updated:YYYY-MM-DD` in metadata (adds metadata block if missing)
+7. **Cascade to children**: Find all descendant tasks and mark them as done too
+8. Write file back
+9. Re-run indexer to update `todos.json` (unless `--no-reindex`)
+10. **Auto-sync**: Run `tmd sync` on configured files (unless `--no-sync`)
 
 ### Cascade Behavior
 

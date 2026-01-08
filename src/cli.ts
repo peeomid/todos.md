@@ -1,24 +1,24 @@
 #!/usr/bin/env node
+import { handleAddCommand, printAddHelp } from './cli/add-command.js';
+import { handleBlockTemplateCommand, printBlockTemplateHelp } from './cli/block-template-command.js';
+import { handleConfigCommand, printConfigHelp } from './cli/config-command.js';
+import { handleDoneCommand, printDoneHelp } from './cli/done-command.js';
+import { handleEditCommand, printEditHelp } from './cli/edit-command.js';
+import { handleEnrichCommand, printEnrichHelp } from './cli/enrich-command.js';
+import { CliUsageError } from './cli/errors.js';
+import { extractBooleanFlags } from './cli/flag-utils.js';
 import { printHelp, printVersion } from './cli/help.js';
 import { printHelpTopic, printHelpTopicsIndex } from './cli/help-topics.js';
 import { handleIndexCommand, printIndexHelp } from './cli/index-command.js';
+import { handleInitCommand, printInitHelp } from './cli/init-command.js';
+import { handleInteractiveCommand, printInteractiveHelp } from './cli/interactive-command.js';
 import { handleLintCommand, printLintHelp } from './cli/lint-command.js';
-import { handleEnrichCommand, printEnrichHelp } from './cli/enrich-command.js';
 import { handleListCommand, printListHelp } from './cli/list-command.js';
-import { handleShowCommand, printShowHelp } from './cli/show-command.js';
-import { handleDoneCommand, printDoneHelp } from './cli/done-command.js';
-import { handleUndoneCommand, printUndoneHelp } from './cli/undone-command.js';
-import { handleAddCommand, printAddHelp } from './cli/add-command.js';
-import { handleEditCommand, printEditHelp } from './cli/edit-command.js';
 import { handleSearchCommand, printSearchHelp } from './cli/search-command.js';
+import { handleShowCommand, printShowHelp } from './cli/show-command.js';
 import { handleStatsCommand, printStatsHelp } from './cli/stats-command.js';
 import { handleSyncCommand, printSyncHelp } from './cli/sync-command.js';
-import { handleBlockTemplateCommand, printBlockTemplateHelp } from './cli/block-template-command.js';
-import { handleInteractiveCommand, printInteractiveHelp } from './cli/interactive-command.js';
-import { handleConfigCommand, printConfigHelp } from './cli/config-command.js';
-import { handleInitCommand, printInitHelp } from './cli/init-command.js';
-import { CliUsageError } from './cli/errors.js';
-import { extractBooleanFlags } from './cli/flag-utils.js';
+import { handleUndoneCommand, printUndoneHelp } from './cli/undone-command.js';
 
 const VERSION = '0.1.0';
 

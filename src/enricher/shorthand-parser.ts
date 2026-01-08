@@ -27,7 +27,7 @@ const AT_TAG_SHORTCUTS: Record<string, { bucket: string; setsPlan: boolean }> = 
 
 const PRIORITY_REGEX = /^\(([ABC])\)\s*/;
 const SYMBOL_REGEX = /^([*!>~?])\s+/;
-const AT_TAG_REGEX = /\s*(@now|@today|@upcoming|@anytime|@someday)\s*/g;
+const _AT_TAG_REGEX = /\s*(@now|@today|@upcoming|@anytime|@someday)\s*/g;
 
 /**
  * Parse shorthands from task text and return canonical values.

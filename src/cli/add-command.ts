@@ -1,13 +1,13 @@
-import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
-import { buildIndex } from '../indexer/indexer.js';
+import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
 import { insertTask, type TaskMetadata } from '../editor/task-inserter.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
-import { greenText } from './terminal.js';
-import { parseRelativeDate } from './date-utils.js';
+import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
+import { buildIndex } from '../indexer/indexer.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
+import { parseRelativeDate } from './date-utils.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
+import { greenText } from './terminal.js';
 
 interface AddOptions {
   projectId: string;
@@ -73,13 +73,7 @@ Examples:
 }
 
 function parseAddFlags(args: string[]): AddOptions {
-  const boolFlags = extractBooleanFlags(args, [
-    '--json',
-    '--no-reindex',
-    '--no-sync',
-    '--global-config',
-    '-G',
-  ]);
+  const boolFlags = extractBooleanFlags(args, ['--json', '--no-reindex', '--no-sync', '--global-config', '-G']);
   const valueFlags = extractFlags(args, [
     '--config',
     '-c',
@@ -97,9 +91,7 @@ function parseAddFlags(args: string[]): AddOptions {
   const fileFlags = extractMultipleFlags(args, ['--file', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);
@@ -120,7 +112,12 @@ function parseAddFlags(args: string[]): AddOptions {
 
   // Parse tags
   const tagsRaw = valueFlags['--tags'];
-  const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : undefined;
+  const tags = tagsRaw
+    ? tagsRaw
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : undefined;
 
   // Parse plan date
   let plan = valueFlags['--plan'];
@@ -164,18 +161,7 @@ function parseAddFlags(args: string[]): AddOptions {
 }
 
 function runAdd(options: AddOptions): void {
-  const {
-    projectId,
-    text,
-    parent,
-    json,
-    noReindex,
-    output,
-    files,
-    config,
-    configPath,
-    noSync,
-  } = options;
+  const { projectId, text, parent, json, noReindex, output, files, config, configPath, noSync } = options;
 
   // Load index
   const index = readIndexFile(output);
@@ -187,9 +173,7 @@ function runAdd(options: AddOptions): void {
   const project = index.projects[projectId];
   if (!project) {
     const availableProjects = Object.keys(index.projects).join(', ');
-    throw new CliUsageError(
-      `Project '${projectId}' not found. Available projects: ${availableProjects || '(none)'}`
-    );
+    throw new CliUsageError(`Project '${projectId}' not found. Available projects: ${availableProjects || '(none)'}`);
   }
 
   // Validate parent if specified
@@ -249,9 +233,7 @@ function runAdd(options: AddOptions): void {
         localId: newId,
         projectId,
         text,
-        metadata: Object.fromEntries(
-          Object.entries(metadata).filter(([_, v]) => v !== undefined)
-        ),
+        metadata: Object.fromEntries(Object.entries(metadata).filter(([_, v]) => v !== undefined)),
       },
       file: {
         path: project.filePath,

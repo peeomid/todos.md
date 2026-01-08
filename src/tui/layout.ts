@@ -5,4 +5,3 @@ export const AUTOCOMPLETE_PANEL_HEIGHT = 6;
 export function getFooterHeight(options: { searchActive: boolean }): number {
   return BASE_FOOTER_HEIGHT + (options.searchActive ? AUTOCOMPLETE_PANEL_HEIGHT : 0);
 }
-

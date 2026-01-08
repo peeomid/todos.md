@@ -3,13 +3,13 @@
  */
 
 import fs from 'node:fs';
+import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
 import { enrichFiles } from '../enricher/index.js';
 import { buildIndex } from '../indexer/index.js';
-import { writeIndexFile, readIndexFile } from '../indexer/index-file.js';
-import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput, type Config } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
-import { CliUsageError, FileNotFoundError } from './errors.js';
+import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { runInteractiveTui } from '../tui/interactive.js';
+import { CliUsageError, FileNotFoundError } from './errors.js';
+import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { handleSyncCommand } from './sync-command.js';
 
 interface InteractiveOptions {
@@ -52,9 +52,7 @@ function parseInteractiveFlags(args: string[]): InteractiveOptions {
   const fileFlags = extractMultipleFlags(args, ['--file', '--input', '-f']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c'] ?? null);
   const config = loadConfig(configPath ?? undefined);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['--out'] ?? valueFlags['-o']);
   const files = resolveFiles(config, fileFlags);

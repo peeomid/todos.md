@@ -9,7 +9,9 @@ describe('getNowToggleChanges', () => {
   });
 
   it('sets bucket back to today when already now', () => {
-    expect(getNowToggleChanges({ bucket: 'now', plan: '2025-12-10', todayIso: '2025-12-23' })).toEqual({ bucket: 'today' });
+    expect(getNowToggleChanges({ bucket: 'now', plan: '2025-12-10', todayIso: '2025-12-23' })).toEqual({
+      bucket: 'today',
+    });
   });
 
   it('sets plan to today when toggling now→today and plan is empty', () => {
@@ -19,4 +21,3 @@ describe('getNowToggleChanges', () => {
     });
   });
 });
-

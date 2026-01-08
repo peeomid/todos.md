@@ -39,14 +39,9 @@ describe('enrichContent (ID generation)', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-12-26T12:00:00Z'));
 
-    const input = [
-      '# Inbox [project:inbox]',
-      '',
-      '  - [ ] Top A',
-      '  - [ ] Top B',
-      '    - [ ] Child of B',
-      '',
-    ].join('\n');
+    const input = ['# Inbox [project:inbox]', '', '  - [ ] Top A', '  - [ ] Top B', '    - [ ] Child of B', ''].join(
+      '\n'
+    );
 
     const result = enrichContent(input, 'todos.md', { keepShorthands: false, dryRun: true });
     const out = result.modifiedContent.split('\n');
@@ -56,4 +51,3 @@ describe('enrichContent (ID generation)', () => {
     expect(out[4]).toBe('    - [ ] Child of B [id:2.1 created:2025-12-26 updated:2025-12-26]');
   });
 });
-

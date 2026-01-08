@@ -1,5 +1,5 @@
-import { handleSyncCommand } from './sync-command.js';
 import type { Config } from '../config/loader.js';
+import { handleSyncCommand } from './sync-command.js';
 
 interface AutoSyncOptions {
   config: Config;

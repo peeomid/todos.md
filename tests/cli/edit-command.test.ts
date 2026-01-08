@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { handleEditCommand } from '../../src/cli/edit-command.js';
-import { buildIndex } from '../../src/indexer/indexer.js';
 import { writeIndexFile } from '../../src/indexer/index-file.js';
+import { buildIndex } from '../../src/indexer/indexer.js';
 
 let originalCwd: string;
 let tempDir: string;
@@ -38,9 +38,7 @@ describe('tmd edit command', () => {
 
     writeIndexFor([markdownPath]);
 
-    expect(() =>
-      handleEditCommand(['--file', markdownPath, 'proj:1', '--energy', 'high'])
-    ).not.toThrow();
+    expect(() => handleEditCommand(['--file', markdownPath, 'proj:1', '--energy', 'high'])).not.toThrow();
 
     const updated = fs.readFileSync(markdownPath, 'utf-8');
     expect(updated).toContain('energy:high');

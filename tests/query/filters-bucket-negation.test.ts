@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { filterByBucket } from '../../src/query/filters.js';
 import type { Task } from '../../src/schema/index.js';
 
@@ -50,4 +50,3 @@ describe('filterByBucket', () => {
     expect(f(createTask({ bucket: undefined }))).toBe(false);
   });
 });
-

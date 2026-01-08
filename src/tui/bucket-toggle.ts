@@ -13,4 +13,3 @@ export function getNowToggleChanges(params: {
 
   return { bucket: 'now' };
 }
-

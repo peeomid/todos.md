@@ -57,4 +57,3 @@ describe('shouldAllowGlobalQuit', () => {
     ).toBe(true);
   });
 });
-

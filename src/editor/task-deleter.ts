@@ -22,11 +22,7 @@ const TASK_LINE_REGEX = /^(\s*)- \[([ xX])\]\s+(.+)$/;
  *   including nested tasks and indented notes.
  * - Blank lines are deleted only if they sit between subtree content and the next subtree line.
  */
-export function deleteTaskSubtree(
-  filePath: string,
-  lineNumber: number,
-  expectedText: string
-): DeleteResult {
+export function deleteTaskSubtree(filePath: string, lineNumber: number, expectedText: string): DeleteResult {
   if (!fs.existsSync(filePath)) {
     return { success: false, error: `File not found: ${filePath}` };
   }
@@ -73,8 +69,7 @@ export function deleteTaskSubtree(
       const next = lines[lookahead] ?? '';
       const nextIndent = leadingSpaces(next);
       const nextTaskIndent = next.match(TASK_LINE_REGEX)?.[1]?.length ?? null;
-      const inSubtree =
-        (nextTaskIndent !== null && nextTaskIndent > parentIndent) || nextIndent > parentIndent;
+      const inSubtree = (nextTaskIndent !== null && nextTaskIndent > parentIndent) || nextIndent > parentIndent;
       if (!inSubtree) break;
 
       endExclusive++;
@@ -121,4 +116,3 @@ function textsMatch(a: string, b: string): boolean {
   const normalizeB = b.replace(/\s+/g, ' ').trim().toLowerCase();
   return normalizeA === normalizeB;
 }
-

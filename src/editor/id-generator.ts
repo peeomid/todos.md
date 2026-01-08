@@ -17,7 +17,7 @@ export function generateNextId(existingIds: string[], parentId?: string): string
         const firstPart = suffix.split('.')[0];
         return parseInt(firstPart ?? '0', 10);
       })
-      .filter((n) => !isNaN(n));
+      .filter((n) => !Number.isNaN(n));
 
     const maxSuffix = suffixes.length > 0 ? Math.max(...suffixes) : 0;
     return `${parentId}.${maxSuffix + 1}`;
@@ -27,7 +27,7 @@ export function generateNextId(existingIds: string[], parentId?: string): string
   const numericIds = existingIds
     .filter((id) => !id.includes('.')) // Only top-level IDs
     .map((id) => parseInt(id, 10))
-    .filter((n) => !isNaN(n));
+    .filter((n) => !Number.isNaN(n));
 
   const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
   return String(maxId + 1);

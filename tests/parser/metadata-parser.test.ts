@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseMetadataBlock, serializeMetadata } from '../../src/parser/metadata-parser.js';
 
 describe('parseMetadataBlock', () => {

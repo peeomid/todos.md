@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('tmd help output', () => {
   let errSpy: ReturnType<typeof vi.spyOn>;
@@ -20,4 +20,3 @@ describe('tmd help output', () => {
     expect(out).toContain('Scaffold a new todosmd workspace');
   });
 });
-

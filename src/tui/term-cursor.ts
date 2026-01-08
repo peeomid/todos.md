@@ -21,4 +21,3 @@ export function setCursorVisible(term: any, visible: boolean): void {
     return;
   }
 }
-

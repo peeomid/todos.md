@@ -2,12 +2,12 @@
  * tmd show - Display detailed information about a single task
  */
 
-import { readIndexFile } from '../indexer/index-file.js';
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { extractBooleanFlags, extractFlags } from './flag-utils.js';
-import { CliUsageError } from './errors.js';
+import { readIndexFile } from '../indexer/index-file.js';
 import type { Task, TaskIndex } from '../schema/index.js';
-import { boldText, dimText, cyanText, greenText } from './terminal.js';
+import { CliUsageError } from './errors.js';
+import { extractBooleanFlags, extractFlags } from './flag-utils.js';
+import { boldText, cyanText, dimText, greenText } from './terminal.js';
 
 interface ShowOptions {
   globalId: string;
@@ -25,9 +25,7 @@ function parseShowFlags(args: string[]): ShowOptions {
   const valueFlags = extractFlags(args, ['--config', '-c', '--output', '-o']);
 
   const useGlobalConfig = boolFlags.has('--global-config') || boolFlags.has('-G');
-  const configPath = useGlobalConfig
-    ? getGlobalConfigPath()
-    : (valueFlags['--config'] ?? valueFlags['-c']);
+  const configPath = useGlobalConfig ? getGlobalConfigPath() : (valueFlags['--config'] ?? valueFlags['-c']);
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
@@ -40,9 +38,7 @@ function parseShowFlags(args: string[]): ShowOptions {
 
   // Validate ID format (should contain ':')
   if (!globalId.includes(':')) {
-    throw new CliUsageError(
-      `Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`
-    );
+    throw new CliUsageError(`Invalid task ID format: '${globalId}'. Expected 'project:localId' (e.g., 'as-onb:1.1').`);
   }
 
   return {
@@ -68,9 +64,7 @@ function runShow(options: ShowOptions): void {
   // Get related info
   const project = index.projects[task.projectId];
   const parent = task.parentId ? (index.tasks[task.parentId] ?? null) : null;
-  const children = task.childrenIds
-    .map((id) => index.tasks[id])
-    .filter((t): t is Task => t !== undefined);
+  const children = task.childrenIds.map((id) => index.tasks[id]).filter((t): t is Task => t !== undefined);
 
   if (options.json) {
     console.log(formatShowJson(task, project, parent, children));
@@ -83,7 +77,7 @@ function formatShowJson(
   task: Task,
   project: { id: string; name: string; area?: string } | undefined,
   parent: Task | null,
-  children: Task[]
+  _children: Task[]
 ): string {
   const output = {
     globalId: task.globalId,

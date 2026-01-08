@@ -27,4 +27,3 @@ describe('shouldShowAutoReloadIndicator', () => {
     expect(shouldShowAutoReloadIndicator({ lastAtMs: 1000, files: ['a'] }, 5001)).toBe(false);
   });
 });
-

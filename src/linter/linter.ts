@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { parseMarkdownContent } from '../parser/index.js';
-import type { LintContext, LintIssue, LintSummary, LintFix } from './types.js';
 import { allRules } from './rules/index.js';
+import type { LintContext, LintFix, LintIssue, LintSummary } from './types.js';
 
 export interface LinterResult {
   issues: LintIssue[];
@@ -113,7 +113,7 @@ export function lintFiles(filePaths: string[], options: LintOptions = {}): Linte
  * to avoid line number shifts during replacement.
  */
 function applyFixes(filePath: string, fixes: LintFix[]): void {
-  let content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split('\n');
 
   // Sort fixes by line number in reverse order

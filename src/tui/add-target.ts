@@ -1,4 +1,4 @@
-import type { TaskIndex, Task } from '../schema/index.js';
+import type { Task, TaskIndex } from '../schema/index.js';
 
 export type AddTargetReason = 'project-drilldown' | 'single-project-list' | 'selected-task' | 'inbox-fallback' | 'none';
 
@@ -37,4 +37,3 @@ export function decideAddTargetProjectId(args: {
 
   return { projectId: null, reason: 'none' };
 }
-

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRelativeDate } from '../../src/cli/date-utils.js';
 
 describe('parseRelativeDate', () => {
@@ -24,4 +24,3 @@ describe('parseRelativeDate', () => {
     expect(parseRelativeDate('+2w')).toBe('2026-01-02');
   });
 });
-

@@ -1,4 +1,4 @@
-import type { LintRule, LintContext, LintIssue } from '../types.js';
+import type { LintContext, LintIssue, LintRule } from '../types.js';
 
 export const orphanSubtaskRule: LintRule = {
   name: 'orphan-subtask',
