@@ -174,6 +174,33 @@ npm pack --dry-run
 npm publish
 ```
 
+### Homebrew Tap Update (peeomid/homebrew-tap)
+
+After publishing to npm, update the Homebrew formula to point at the new tarball:
+
+```bash
+# 1. Fetch tarball + compute sha256
+VERSION=0.1.1
+curl -L "https://registry.npmjs.org/todosmd/-/todosmd-${VERSION}.tgz" -o /tmp/todosmd-${VERSION}.tgz
+shasum -a 256 /tmp/todosmd-${VERSION}.tgz
+
+# 2. Update formula in peeomid/homebrew-tap
+#   Formula/todosmd.rb:
+#   - url    https://registry.npmjs.org/todosmd/-/todosmd-${VERSION}.tgz
+#   - sha256 <sha-from-shasum>
+
+# 3. Commit + push tap
+git -C /path/to/homebrew-tap add Formula/todosmd.rb
+git -C /path/to/homebrew-tap commit -m "Update todosmd to ${VERSION}"
+git -C /path/to/homebrew-tap push
+
+# 4. Verify via brew
+brew tap peeomid/tap
+brew install peeomid/tap/todosmd
+brew upgrade peeomid/tap/todosmd
+tmd --version
+```
+
 ### Version Bumping
 
 ```bash
