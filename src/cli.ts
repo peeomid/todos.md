@@ -7,6 +7,7 @@ import { handleEditCommand, printEditHelp } from './cli/edit-command.js';
 import { handleEnrichCommand, printEnrichHelp } from './cli/enrich-command.js';
 import { CliUsageError } from './cli/errors.js';
 import { extractBooleanFlags } from './cli/flag-utils.js';
+import { createRequire } from 'node:module';
 import { printHelp, printVersion } from './cli/help.js';
 import { printHelpTopic, printHelpTopicsIndex } from './cli/help-topics.js';
 import { handleIndexCommand, printIndexHelp } from './cli/index-command.js';
@@ -20,7 +21,15 @@ import { handleStatsCommand, printStatsHelp } from './cli/stats-command.js';
 import { handleSyncCommand, printSyncHelp } from './cli/sync-command.js';
 import { handleUndoneCommand, printUndoneHelp } from './cli/undone-command.js';
 
-const VERSION = '0.1.0';
+const VERSION = (() => {
+  try {
+    const require = createRequire(import.meta.url);
+    const pkg = require('../package.json') as { version?: string };
+    return pkg.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
