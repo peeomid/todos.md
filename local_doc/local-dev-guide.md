@@ -224,11 +224,11 @@ npm install todosmd
 
 ### Optional: Homebrew tap (advanced)
 
-Create a separate `homebrew-tap` repository with a formula:
+Create a separate `homebrew-tap` repository with a formula (currently `peeomid/homebrew-tap`):
 
 ```bash
-brew tap your-username/tap
-brew install your-username/tap/todosmd
+brew tap peeomid/tap
+brew install peeomid/tap/todosmd
 ```
 
 ---
