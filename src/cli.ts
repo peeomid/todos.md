@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
 import { handleAddCommand, printAddHelp } from './cli/add-command.js';
 import { handleBlockTemplateCommand, printBlockTemplateHelp } from './cli/block-template-command.js';
 import { handleConfigCommand, printConfigHelp } from './cli/config-command.js';
@@ -7,7 +8,6 @@ import { handleEditCommand, printEditHelp } from './cli/edit-command.js';
 import { handleEnrichCommand, printEnrichHelp } from './cli/enrich-command.js';
 import { CliUsageError } from './cli/errors.js';
 import { extractBooleanFlags } from './cli/flag-utils.js';
-import { createRequire } from 'node:module';
 import { printHelp, printVersion } from './cli/help.js';
 import { printHelpTopic, printHelpTopicsIndex } from './cli/help-topics.js';
 import { handleIndexCommand, printIndexHelp } from './cli/index-command.js';
