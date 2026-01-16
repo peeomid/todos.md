@@ -1626,7 +1626,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
     }
   }
 
-  function backfillCompletedAt(state: State): boolean {
+  function backfillCompletedAt(state: SessionState): boolean {
     const completedWithoutDate = Object.values(state.index.tasks).filter(
       (task) => task.completed && !task.completedAt
     );
