@@ -3,9 +3,9 @@ import { generateNextId, getExistingIdsForProject } from '../editor/id-generator
 import { insertTask, type TaskMetadata } from '../editor/task-inserter.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
+import { todayLocalIso } from '../utils/date.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
 import { parseRelativeDate } from './date-utils.js';
-import { todayLocalIso } from '../utils/date.js';
 import { CliUsageError } from './errors.js';
 import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { greenText } from './terminal.js';

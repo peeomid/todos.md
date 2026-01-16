@@ -7,22 +7,22 @@
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
 import { readIndexFile } from '../indexer/index-file.js';
 import type { Task } from '../schema/index.js';
+import { parseDateSpec } from './date-utils.js';
 import { CliUsageError } from './errors.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import {
   applyDefaultStatusToGroups,
   buildFilterGroups,
   composeFilterGroups,
-  parseFilterArg,
   type FilterOptions,
   type GroupField,
   groupTasks,
+  parseFilterArg,
   parseFilterArgs,
   parseQueryToFilterGroups,
   type SortField,
   sortTasks,
 } from './list-filters.js';
-import { parseDateSpec } from './date-utils.js';
 import {
   type FormatStyle,
   formatCompactFlat,

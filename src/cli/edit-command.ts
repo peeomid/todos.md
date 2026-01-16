@@ -7,8 +7,8 @@ import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutp
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
-import { todayLocalIso } from '../utils/date.js';
 import type { Task } from '../schema/index.js';
+import { todayLocalIso } from '../utils/date.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
 import { parseRelativeDate } from './date-utils.js';
 import { CliUsageError } from './errors.js';

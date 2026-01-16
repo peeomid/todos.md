@@ -30,10 +30,7 @@ describe('normalizeListQueryArgs', () => {
   });
 
   it('does not rewrite explicit filters', () => {
-    expect(normalizeListQueryArgs(['status:done', 'updated:yesterday'])).toEqual([
-      'status:done',
-      'updated:yesterday',
-    ]);
+    expect(normalizeListQueryArgs(['status:done', 'updated:yesterday'])).toEqual(['status:done', 'updated:yesterday']);
     expect(normalizeListQueryArgs(['done', 'due:today'])).toEqual(['status:done', 'due:today']);
   });
 });

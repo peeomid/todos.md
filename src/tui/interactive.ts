@@ -15,7 +15,6 @@ import {
 import { enrichFiles } from '../enricher/index.js';
 import { buildIndex } from '../indexer/index.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
-import { todayLocalIso } from '../utils/date.js';
 import {
   buildFilterGroups,
   composeFilterGroups,
@@ -31,6 +30,7 @@ import {
   sortTasksByFieldsWithOverrides,
 } from '../query/filters.js';
 import type { Priority, Project, Task, TaskIndex } from '../schema/index.js';
+import { todayLocalIso } from '../utils/date.js';
 import { decideAddTargetProjectId } from './add-target.js';
 import { type AutoReloadIndicator, formatAutoReloadLabel, shouldShowAutoReloadIndicator } from './auto-reload.js';
 import {
@@ -1627,9 +1627,7 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
   }
 
   function backfillCompletedAt(state: SessionState): boolean {
-    const completedWithoutDate = Object.values(state.index.tasks).filter(
-      (task) => task.completed && !task.completedAt
-    );
+    const completedWithoutDate = Object.values(state.index.tasks).filter((task) => task.completed && !task.completedAt);
     if (completedWithoutDate.length === 0) return false;
 
     let updated = false;
