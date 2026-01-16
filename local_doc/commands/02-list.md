@@ -34,10 +34,11 @@ Filters use a unified `key:value` syntax. Spaces are AND. Use `|` or `OR` for OR
 | `bucket:<bucket>` | Filter by bucket | `bucket:today` |
 | `plan:<date>` | Filter by plan date | `plan:today` |
 | `updated:<date>` | Filter by updated date | `updated:yesterday` |
+| `completed:<date>` | Filter by completed date (`completedAt`) | `completed:yesterday` |
 | `parent:<id>` | Show children of a task | `parent:as-onb:1` |
 | `top-level:true` | Show only top-level tasks | `top-level:true` |
 
-Date specs (for `due`, `plan`, `updated`):
+Date specs (for `due`, `plan`, `updated`, `completed`):
 - `today`, `yesterday`, `tomorrow`
 - `this-week`, `next-week`
 - `last-7d`, `last-30d`
@@ -50,7 +51,7 @@ Boolean logic:
 Shortcut:
 - `tmd list today` expands to `(bucket:today | plan:today | due:today)`
 - Status shorthands: `done`, `open`, `all` → `status:done|open|all`
-- When `done` is present, a bare date spec maps to `updated:<date>` (e.g. `done yesterday`)
+- When `done` is present, a bare date spec maps to `completed:<date>` (e.g. `done yesterday`)
 
 ## Display Options
 
@@ -237,11 +238,12 @@ The `due:`, `plan:`, and other date filters accept special values:
 ## Behavior
 
 1. Load `todos.json` from configured path
-2. Apply filters in order
-3. Sort results
-4. Group if requested
-5. Format output
-6. Print summary
+2. Backfill `completedAt` for done tasks missing it (writes source + reindexes)
+3. Apply filters in order
+4. Sort results
+5. Group if requested
+6. Format output
+7. Print summary
 
 ---
 

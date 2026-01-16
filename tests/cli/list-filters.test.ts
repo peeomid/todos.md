@@ -5,6 +5,7 @@ import {
   composeFilters,
   filterByArea,
   filterByBucket,
+  filterByCompleted,
   filterByEnergy,
   filterByParent,
   filterByPriority,
@@ -93,6 +94,11 @@ describe('parseFilterArgs', () => {
   it('parses updated filter', () => {
     const result = parseFilterArgs(['updated:yesterday']);
     expect(result.updated).toBe('yesterday');
+  });
+
+  it('parses completed filter', () => {
+    const result = parseFilterArgs(['completed:yesterday']);
+    expect(result.completed).toBe('yesterday');
   });
 
   it('parses text filter', () => {
@@ -200,6 +206,33 @@ describe('individual filters', () => {
     it('returns false when task has no updated date', () => {
       const filter = filterByUpdated('today');
       expect(filter(createTask({ updated: undefined }))).toBe(false);
+    });
+  });
+
+  describe('filterByCompleted', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2025, 0, 10, 12, 0, 0));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('matches yesterday when completedAt is present', () => {
+      const filter = filterByCompleted('yesterday');
+      expect(filter(createTask({ completed: true, completedAt: '2025-01-09' }))).toBe(true);
+      expect(filter(createTask({ completed: true, completedAt: '2025-01-10' }))).toBe(false);
+    });
+
+    it('returns false when completedAt is missing', () => {
+      const filter = filterByCompleted('today');
+      expect(filter(createTask({ completed: true, completedAt: undefined }))).toBe(false);
+    });
+
+    it('returns false when task is not completed', () => {
+      const filter = filterByCompleted('today');
+      expect(filter(createTask({ completed: false, completedAt: '2025-01-10' }))).toBe(false);
     });
   });
 

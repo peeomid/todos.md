@@ -5,7 +5,10 @@
  */
 
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { readIndexFile } from '../indexer/index-file.js';
+import { ensureTaskCompletedAt } from '../editor/task-editor.js';
+import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
+import { buildIndex } from '../indexer/indexer.js';
+import type { TaskIndex } from '../schema/index.js';
 import { CliUsageError } from './errors.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
 import {
@@ -84,10 +87,11 @@ function parseSearchFlags(args: string[]): SearchOptions {
 
 function runSearch(options: SearchOptions): void {
   // Load index
-  const index = readIndexFile(options.output);
+  let index = readIndexFile(options.output);
   if (!index) {
     throw new CliUsageError(`No index found. Run \`tmd index\` first.`);
   }
+  index = backfillCompletedAt(index, options.output);
 
   // Build filters from options + text filter
   const groupFilters = buildFilterGroups(options.filterGroups).map((groupFilter) =>
@@ -144,6 +148,25 @@ function runSearch(options: SearchOptions): void {
   }
 
   console.log(`${sortedTasks.length} tasks found`);
+}
+
+function backfillCompletedAt(index: TaskIndex, output: string): TaskIndex {
+  const completedWithoutDate = Object.values(index.tasks).filter((task) => task.completed && !task.completedAt);
+  if (completedWithoutDate.length === 0) return index;
+
+  let updated = false;
+  for (const task of completedWithoutDate) {
+    const result = ensureTaskCompletedAt(task.filePath, task.lineNumber, task.text);
+    if (!result.success) {
+      throw new CliUsageError(result.error ?? `Failed to backfill completedAt for ${task.globalId}`);
+    }
+    if (result.updated) updated = true;
+  }
+
+  if (!updated) return index;
+  const { index: newIndex } = buildIndex(index.files);
+  writeIndexFile(newIndex, output);
+  return newIndex;
 }
 
 export function printSearchHelp(): void {

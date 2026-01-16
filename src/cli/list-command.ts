@@ -5,8 +5,10 @@
  */
 
 import { getGlobalConfigPath, loadConfig, resolveOutput } from '../config/loader.js';
-import { readIndexFile } from '../indexer/index-file.js';
-import type { Task } from '../schema/index.js';
+import { ensureTaskCompletedAt } from '../editor/task-editor.js';
+import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
+import { buildIndex } from '../indexer/indexer.js';
+import type { Task, TaskIndex } from '../schema/index.js';
 import { parseDateSpec } from './date-utils.js';
 import { CliUsageError } from './errors.js';
 import { extractBooleanFlags, extractFlags } from './flag-utils.js';
@@ -68,10 +70,10 @@ export function normalizeListQueryArgs(args: string[]): string[] {
   return args.map((arg) => {
     if (STATUS_SHORTHANDS[arg]) return STATUS_SHORTHANDS[arg];
     if (arg === TODAY_SHORTCUT) {
-      return hasDone ? 'updated:today' : TODAY_QUERY;
+      return hasDone ? 'completed:today' : TODAY_QUERY;
     }
     if (hasDone && isBareDateSpec(arg)) {
-      return `updated:${arg}`;
+      return `completed:${arg}`;
     }
     return arg;
   });
@@ -167,10 +169,12 @@ function parseListFlags(args: string[]): ListOptions {
 
 function runList(options: ListOptions): void {
   // Load index
-  const index = readIndexFile(options.output);
+  let index = readIndexFile(options.output);
   if (!index) {
     throw new CliUsageError(`No index found. Run \`tmd index\` first.`);
   }
+
+  index = backfillCompletedAt(index, options.output);
 
   // Build filters from options
   const groupFilters = buildFilterGroups(options.filterGroups);
@@ -217,6 +221,25 @@ function runList(options: ListOptions): void {
   }
 }
 
+function backfillCompletedAt(index: TaskIndex, output: string): TaskIndex {
+  const completedWithoutDate = Object.values(index.tasks).filter((task) => task.completed && !task.completedAt);
+  if (completedWithoutDate.length === 0) return index;
+
+  let updated = false;
+  for (const task of completedWithoutDate) {
+    const result = ensureTaskCompletedAt(task.filePath, task.lineNumber, task.text);
+    if (!result.success) {
+      throw new CliUsageError(result.error ?? `Failed to backfill completedAt for ${task.globalId}`);
+    }
+    if (result.updated) updated = true;
+  }
+
+  if (!updated) return index;
+  const { index: newIndex } = buildIndex(index.files);
+  writeIndexFile(newIndex, output);
+  return newIndex;
+}
+
 /**
  * Format tasks as markdown (same format as sync blocks)
  */
@@ -259,6 +282,7 @@ export function printListHelp(): void {
     '                        today | yesterday | tomorrow | this-week | next-week | last-7d | last-30d | YYYY-MM-DD | YYYY-MM-DD:YYYY-MM-DD',
     '  plan:<date>           Filter by plan date spec (same formats as due:)',
     '  updated:<date>        Filter by updated date spec (same formats as due:)',
+    '  completed:<date>      Filter by completedAt date spec (same formats as due:)',
     '  bucket:<name>         Filter by bucket (today, upcoming, anytime, someday, now, or custom)',
     '  overdue:true          Show only overdue tasks',
     '  status:<status>       Filter by status (open, done, all) [default: open]',
@@ -290,6 +314,7 @@ export function printListHelp(): void {
     '  tmd list plan:next-week           # Planned next week',
     '  tmd list overdue:true             # Overdue tasks',
     '  tmd list status:done              # Completed tasks',
+    '  tmd list completed:yesterday      # Completed yesterday',
     '  tmd list bucket:today --sort priority  # Today by priority',
     '  tmd list --json                   # JSON output',
     '  tmd list --format markdown        # Markdown format',

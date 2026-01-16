@@ -28,6 +28,7 @@ Added `completedAt:YYYY-MM-DD` to track completion date separately from `created
 - `tmd undone` clears `completedAt` when reopening a task.
 - `tmd sync` backfills `completedAt` for done tasks missing it during pull.
 - TUI auto-backfills `completedAt` for completed tasks on reload.
+- `tmd list`/`tmd search` backfill `completedAt` for done tasks missing it.
 - Stats use `completedAt` when present (fallback to `updated`).
 
 ### Files Updated

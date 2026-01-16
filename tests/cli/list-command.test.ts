@@ -9,11 +9,11 @@ describe('normalizeListQueryArgs', () => {
   });
 
   it('maps date specs to updated when done is present', () => {
-    expect(normalizeListQueryArgs(['done', 'yesterday'])).toEqual(['status:done', 'updated:yesterday']);
-    expect(normalizeListQueryArgs(['status:done', '2026-01-14'])).toEqual(['status:done', 'updated:2026-01-14']);
+    expect(normalizeListQueryArgs(['done', 'yesterday'])).toEqual(['status:done', 'completed:yesterday']);
+    expect(normalizeListQueryArgs(['status:done', '2026-01-14'])).toEqual(['status:done', 'completed:2026-01-14']);
     expect(normalizeListQueryArgs(['done', '2026-01-01:2026-01-07'])).toEqual([
       'status:done',
-      'updated:2026-01-01:2026-01-07',
+      'completed:2026-01-01:2026-01-07',
     ]);
   });
 
@@ -26,11 +26,15 @@ describe('normalizeListQueryArgs', () => {
   });
 
   it('maps today to updated when done is present', () => {
-    expect(normalizeListQueryArgs(['done', 'today'])).toEqual(['status:done', 'updated:today']);
+    expect(normalizeListQueryArgs(['done', 'today'])).toEqual(['status:done', 'completed:today']);
   });
 
   it('does not rewrite explicit filters', () => {
     expect(normalizeListQueryArgs(['status:done', 'updated:yesterday'])).toEqual(['status:done', 'updated:yesterday']);
+    expect(normalizeListQueryArgs(['status:done', 'completed:yesterday'])).toEqual([
+      'status:done',
+      'completed:yesterday',
+    ]);
     expect(normalizeListQueryArgs(['done', 'due:today'])).toEqual(['status:done', 'due:today']);
   });
 });

@@ -237,6 +237,7 @@ export function formatJson(tasks: Task[], payload: ListFilterPayload): string {
       bucket: task.bucket,
       area: task.area,
       tags: task.tags,
+      completedAt: task.completedAt,
       parentId: task.parentId,
       childrenIds: task.childrenIds,
     })),

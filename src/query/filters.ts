@@ -41,6 +41,7 @@ export interface FilterOptions {
   plan?: string;
   bucket?: string;
   updated?: string;
+  completed?: string;
   overdue?: boolean;
   status?: 'open' | 'done' | 'all';
   tags?: string;
@@ -257,6 +258,9 @@ export function parseFilterArgs(args: string[]): FilterOptions {
       case 'updated':
         options.updated = value;
         break;
+      case 'completed':
+        options.completed = value;
+        break;
       case 'overdue':
         options.overdue = value === 'true';
         break;
@@ -401,6 +405,22 @@ export function filterByUpdated(dateSpec: string): TaskFilter {
       return false;
     }
     return isDateInRange(task.updated, range);
+  };
+}
+
+/**
+ * Filter by completed date spec (today, yesterday, last-7d, etc.)
+ */
+export function filterByCompleted(dateSpec: string): TaskFilter {
+  const range = parseDateSpec(dateSpec);
+  if (!range) {
+    throw new Error(`Invalid completed date filter: '${dateSpec}'`);
+  }
+  return (task) => {
+    if (!task.completed || !task.completedAt) {
+      return false;
+    }
+    return isDateInRange(task.completedAt, range);
   };
 }
 
@@ -705,6 +725,9 @@ export function buildFiltersFromOptions(options: FilterOptions): TaskFilter[] {
   }
   if (options.updated) {
     filters.push(filterByUpdated(options.updated));
+  }
+  if (options.completed) {
+    filters.push(filterByCompleted(options.completed));
   }
   if (options.overdue) {
     filters.push(filterOverdue());
