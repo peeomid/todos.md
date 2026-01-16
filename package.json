@@ -1,6 +1,6 @@
 {
   "name": "todosmd",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "CLI tool for managing tasks in Markdown files",
   "type": "module",
   "main": "dist/index.js",

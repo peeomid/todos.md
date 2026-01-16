@@ -18,6 +18,27 @@ Added a global CLI flag to force using the global config file even when a projec
 
 ---
 
+## 2026-01-16: CompletedAt Metadata
+
+### Overview
+Added `completedAt:YYYY-MM-DD` to track completion date separately from `created`/`updated`.
+
+### Behavior
+- `tmd done` sets `completedAt` when marking a task done.
+- `tmd undone` clears `completedAt` when reopening a task.
+- `tmd sync` backfills `completedAt` for done tasks missing it during pull.
+- TUI auto-backfills `completedAt` for completed tasks on reload.
+- Stats use `completedAt` when present (fallback to `updated`).
+
+### Files Updated
+- `todo-format-spec.md` - added `completedAt` metadata key
+- `cli-architecture.md` - task schema includes `completedAt`
+- `commands/04-done.md` - set `completedAt` on done
+- `commands/05-undone.md` - clear `completedAt` on undo
+- `commands/09-sync.md` - backfill behavior during pull
+- `commands/13-stats.md` - completion date source
+- `tui.md` - TUI changelog entry
+
 ## 2025-12-10: Multi-Level Project Hierarchies (Clarification)
 
 ### New Sections in todo-format-spec.md
