@@ -187,7 +187,7 @@ Inside `[...]` everything is `key:value` separated by spaces.
 
 ### Date-related keys
 
-All dates use `YYYY-MM-DD`.
+All dates use `YYYY-MM-DD` and represent the local calendar date (not UTC).
 
 * `plan` – **planned work date** (when I intend to do this).
 

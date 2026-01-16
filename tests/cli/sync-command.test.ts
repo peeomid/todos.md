@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { handleSyncCommand } from '../../src/cli/sync-command.js';
 import { writeIndexFile } from '../../src/indexer/index-file.js';
 import { buildIndex } from '../../src/indexer/indexer.js';
+import { todayLocalIso } from '../../src/utils/date.js';
 
 let originalCwd: string;
 let tempDir: string;
@@ -56,6 +57,43 @@ describe('tmd sync command', () => {
     expect(() => handleSyncCommand(['--file', viewPath, '--pull-only'])).not.toThrow();
 
     const updatedMarkdown = fs.readFileSync(markdownPath, 'utf-8');
-    expect(updatedMarkdown).toContain('- [x] Child task [id:1.1]');
+    expect(updatedMarkdown).toContain('- [x] Child task [id:1.1');
+  });
+
+  it('backfills completedAt for already-done tasks during pull', () => {
+    const markdownPath = path.join(tempDir, 'todos.md');
+    fs.writeFileSync(
+      markdownPath,
+      `# Project [project:proj]
+
+- [x] Done task [id:1]
+`
+    );
+
+    const { index } = buildIndex([markdownPath]);
+    writeIndexFile(index, path.join(tempDir, 'todos.json'));
+
+    const viewPath = path.join(tempDir, 'view.md');
+    fs.writeFileSync(
+      viewPath,
+      `<!-- tmd:start query="status:all project:proj" -->
+- [x] Done task [id:proj:1]
+<!-- tmd:end -->
+`
+    );
+
+    fs.writeFileSync(
+      path.join(tempDir, '.todosmd.json'),
+      JSON.stringify({
+        files: ['todos.md'],
+        output: 'todos.json',
+        views: ['view.md'],
+      })
+    );
+
+    expect(() => handleSyncCommand(['--file', viewPath, '--pull-only'])).not.toThrow();
+
+    const updatedMarkdown = fs.readFileSync(markdownPath, 'utf-8');
+    expect(updatedMarkdown).toContain(`completedAt:${todayLocalIso()}`);
   });
 });

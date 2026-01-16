@@ -54,6 +54,7 @@ export const TaskSchema = z.object({
   tags: z.array(z.string()).optional(),
   created: z.string().optional(),
   updated: z.string().optional(),
+  completedAt: z.string().optional(),
 
   // Location
   filePath: z.string(),

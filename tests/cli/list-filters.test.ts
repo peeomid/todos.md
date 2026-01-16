@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyDefaultStatusToGroups,
   buildFiltersFromOptions,
@@ -12,6 +12,7 @@ import {
   filterByStatus,
   filterByTags,
   filterByText,
+  filterByUpdated,
   filterTopLevel,
   groupTasks,
   parseFilterArg,
@@ -87,6 +88,11 @@ describe('parseFilterArgs', () => {
   it('parses plan filter', () => {
     const result = parseFilterArgs(['plan:this-week']);
     expect(result.plan).toBe('this-week');
+  });
+
+  it('parses updated filter', () => {
+    const result = parseFilterArgs(['updated:yesterday']);
+    expect(result.updated).toBe('yesterday');
   });
 
   it('parses text filter', () => {
@@ -166,6 +172,34 @@ describe('individual filters', () => {
       const filter = filterByText('important');
       expect(filter(createTask({ text: 'This is IMPORTANT task' }))).toBe(true);
       expect(filter(createTask({ text: 'Regular task' }))).toBe(false);
+    });
+  });
+
+  describe('filterByUpdated', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2025, 0, 10, 12, 0, 0));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('matches yesterday', () => {
+      const filter = filterByUpdated('yesterday');
+      expect(filter(createTask({ updated: '2025-01-09' }))).toBe(true);
+      expect(filter(createTask({ updated: '2025-01-10' }))).toBe(false);
+    });
+
+    it('matches last-7d', () => {
+      const filter = filterByUpdated('last-7d');
+      expect(filter(createTask({ updated: '2025-01-04' }))).toBe(true);
+      expect(filter(createTask({ updated: '2025-01-03' }))).toBe(false);
+    });
+
+    it('returns false when task has no updated date', () => {
+      const filter = filterByUpdated('today');
+      expect(filter(createTask({ updated: undefined }))).toBe(false);
     });
   });
 

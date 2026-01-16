@@ -5,6 +5,7 @@ import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
 import { runAutoSyncIfNeeded } from './auto-sync.js';
 import { parseRelativeDate } from './date-utils.js';
+import { todayLocalIso } from '../utils/date.js';
 import { CliUsageError } from './errors.js';
 import { extractBooleanFlags, extractFlags, extractMultipleFlags } from './flag-utils.js';
 import { greenText } from './terminal.js';
@@ -190,7 +191,6 @@ function runAdd(options: AddOptions): void {
   const globalId = `${projectId}:${newId}`;
 
   // Build metadata
-  const today = new Date().toISOString().split('T')[0]!;
   const metadata: TaskMetadata = {
     id: newId,
     energy: options.energy,
@@ -200,7 +200,7 @@ function runAdd(options: AddOptions): void {
     bucket: options.bucket,
     area: options.area,
     tags: options.tags,
-    created: today,
+    created: todayLocalIso(),
   };
 
   // Insert task

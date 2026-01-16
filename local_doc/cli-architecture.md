@@ -305,6 +305,7 @@ interface TaskIndex {
       tags?: string[];
       created?: string;
       updated?: string;
+      completedAt?: string;
 
       // Location
       filePath: string;

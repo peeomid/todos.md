@@ -267,6 +267,8 @@ Sync runs in two phases:
    - Look up by global ID in index
    - If source file has `[ ]` (open):
      - Mark as `[x]` in source file (same logic as `tmd done`)
+   - If source file is already `[x]` and `completedAt` is missing:
+     - Backfill `completedAt:YYYY-MM-DD` as today
 4. Run `tmd index` to update `todos.json`
 
 **"Done wins" rule**: If a task is marked done in ANY view file OR source file, it's treated as done. This prevents conflicts and matches user intent (you don't accidentally un-complete tasks).

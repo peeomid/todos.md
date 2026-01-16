@@ -42,8 +42,8 @@ describe('tmd undone command', () => {
     expect(() => handleUndoneCommand(['--file', markdownPath, 'proj:1'])).not.toThrow();
 
     const updated = fs.readFileSync(markdownPath, 'utf-8');
-    expect(updated).toContain('- [ ] Parent [id:1]');
-    expect(updated).toContain('- [x] Child [id:1.1]');
+    expect(updated).toContain('- [ ] Parent [id:1');
+    expect(updated).toContain('- [x] Child [id:1.1');
   });
 
   it('auto-syncs views after undo without cascading to children', () => {
@@ -81,12 +81,12 @@ describe('tmd undone command', () => {
     handleUndoneCommand(['proj:1']);
 
     const updatedMarkdown = fs.readFileSync(markdownPath, 'utf-8');
-    expect(updatedMarkdown).toContain('- [ ] Parent [id:1]');
-    expect(updatedMarkdown).toContain('- [x] Child [id:1.1]');
+    expect(updatedMarkdown).toContain('- [ ] Parent [id:1');
+    expect(updatedMarkdown).toContain('- [x] Child [id:1.1');
 
     const updatedView = fs.readFileSync(viewPath, 'utf-8');
-    expect(updatedView).toContain('- [ ] Parent [id:proj:1]');
-    expect(updatedView).toContain('- [x] Child [id:proj:1.1]');
+    expect(updatedView).toContain('- [ ] Parent [id:proj:1');
+    expect(updatedView).toContain('- [x] Child [id:proj:1.1');
   });
 
   it('respects --no-sync flag', () => {
@@ -123,6 +123,6 @@ describe('tmd undone command', () => {
     expect(updatedView).toBe(originalView);
 
     const updatedMarkdown = fs.readFileSync(markdownPath, 'utf-8');
-    expect(updatedMarkdown).toContain('- [ ] Parent [id:1]');
+    expect(updatedMarkdown).toContain('- [ ] Parent [id:1');
   });
 });

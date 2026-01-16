@@ -1,8 +1,10 @@
----
-task_format_version: 1
----
+# AgentTap Todos
 
-# Todos.md [project:tmd area:life]
+## Features
 
-- [x] Watch for changes from todos.md and reload
-- [x] Add under subheading
+## Features
+
+- [ ] Shortcut to open app list
+- [ ] App list should be keyboard friendly
+- [ ] Quickly focus on a session from keyboard (consider a switcher UI)
+- [ ] Detect when an agent is finished

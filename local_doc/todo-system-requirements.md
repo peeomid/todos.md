@@ -134,7 +134,7 @@ I want a small, consistent set of standard keys, plus flexibility for custom one
   * `tags` (optional) – extra tags as a comma-separated list (e.g. `tags:email,admin`).
 * **Date format**:
 
-  * All dates use **`YYYY-MM-DD`** for consistency and easy sorting.
+  * All dates use **`YYYY-MM-DD`** for consistency and easy sorting (local calendar date, not UTC).
 * Any other keys are allowed as **custom fields** and should be ignored gracefully by tools that don’t care.
 
 ---

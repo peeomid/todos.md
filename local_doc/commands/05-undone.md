@@ -93,9 +93,10 @@ Task already open: as-onb:1.1 (Subject lines A/B test)
 4. Verify it's the expected task (safety check)
 5. Change `- [x]` to `- [ ]`
 6. Update `updated:YYYY-MM-DD` in metadata (adds metadata block if missing)
-7. Write file back
-8. Re-run indexer to update `todos.json` (unless `--no-reindex`)
-9. **Auto-sync**: Run `tmd sync` on configured files (unless `--no-sync`)
+7. Clear `completedAt` if present
+8. Write file back
+9. Re-run indexer to update `todos.json` (unless `--no-reindex`)
+10. **Auto-sync**: Run `tmd sync` on configured files (unless `--no-sync`)
 
 ### No Cascade Behavior
 

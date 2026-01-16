@@ -33,12 +33,24 @@ Filters use a unified `key:value` syntax. Spaces are AND. Use `|` or `OR` for OR
 | `tags:<tags>` | Filter by tags (comma-separated) | `tags:email,urgent` |
 | `bucket:<bucket>` | Filter by bucket | `bucket:today` |
 | `plan:<date>` | Filter by plan date | `plan:today` |
+| `updated:<date>` | Filter by updated date | `updated:yesterday` |
 | `parent:<id>` | Show children of a task | `parent:as-onb:1` |
 | `top-level:true` | Show only top-level tasks | `top-level:true` |
+
+Date specs (for `due`, `plan`, `updated`):
+- `today`, `yesterday`, `tomorrow`
+- `this-week`, `next-week`
+- `last-7d`, `last-30d`
+- `YYYY-MM-DD`, `YYYY-MM-DD:YYYY-MM-DD`
 
 Boolean logic:
 - Space = AND
 - `|` or `OR` = OR (use parentheses to group)
+
+Shortcut:
+- `tmd list today` expands to `(bucket:today | plan:today | due:today)`
+- Status shorthands: `done`, `open`, `all` → `status:done|open|all`
+- When `done` is present, a bare date spec maps to `updated:<date>` (e.g. `done yesterday`)
 
 ## Display Options
 
@@ -57,6 +69,9 @@ Boolean logic:
 ```bash
 # List all open tasks (default: status:open)
 tmd list
+
+# Today shortcut (bucket/plan/due)
+tmd list today
 
 # Filter by project
 tmd list project:as-onb
@@ -81,6 +96,9 @@ tmd list overdue:true
 
 # Completed tasks
 tmd list status:done
+
+# Completed yesterday (shorthand)
+tmd list done yesterday
 
 # Combine filters (AND logic)
 tmd list project:inbox energy:low status:open

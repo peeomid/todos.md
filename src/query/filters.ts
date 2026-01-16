@@ -40,6 +40,7 @@ export interface FilterOptions {
   due?: string;
   plan?: string;
   bucket?: string;
+  updated?: string;
   overdue?: boolean;
   status?: 'open' | 'done' | 'all';
   tags?: string;
@@ -253,6 +254,9 @@ export function parseFilterArgs(args: string[]): FilterOptions {
       case 'bucket':
         options.bucket = mergeCsv(options.bucket, value);
         break;
+      case 'updated':
+        options.updated = value;
+        break;
       case 'overdue':
         options.overdue = value === 'true';
         break;
@@ -381,6 +385,22 @@ export function filterByPlan(dateSpec: string): TaskFilter {
       return false;
     }
     return isDateInRange(task.plan, range);
+  };
+}
+
+/**
+ * Filter by updated date spec (today, yesterday, last-7d, etc.)
+ */
+export function filterByUpdated(dateSpec: string): TaskFilter {
+  const range = parseDateSpec(dateSpec);
+  if (!range) {
+    throw new Error(`Invalid updated date filter: '${dateSpec}'`);
+  }
+  return (task) => {
+    if (!task.updated) {
+      return false;
+    }
+    return isDateInRange(task.updated, range);
   };
 }
 
@@ -682,6 +702,9 @@ export function buildFiltersFromOptions(options: FilterOptions): TaskFilter[] {
   }
   if (options.bucket) {
     filters.push(filterByBucket(options.bucket));
+  }
+  if (options.updated) {
+    filters.push(filterByUpdated(options.updated));
   }
   if (options.overdue) {
     filters.push(filterOverdue());

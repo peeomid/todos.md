@@ -95,6 +95,7 @@ function formatShowJson(
       tags: task.tags,
       created: task.created,
       updated: task.updated,
+      completedAt: task.completedAt,
     },
     project: project
       ? {

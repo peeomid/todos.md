@@ -7,6 +7,7 @@ import {
   type TaskWithHierarchy,
 } from '../parser/index.js';
 import type { AreaHeading, Project, SectionHeading, Task, TaskIndex } from '../schema/index.js';
+import { todayLocalIso } from '../utils/date.js';
 import type { IndexerResult, IndexStats, IndexWarning } from './types.js';
 
 export function buildIndex(filePaths: string[]): IndexerResult {
@@ -231,7 +232,7 @@ function projectFromParsed(parsed: ParsedProject, parentArea: string | undefined
 
 function taskFromParsed(task: TaskWithHierarchy, globalId: string, projectArea: string | undefined): Task {
   const { metadata } = task;
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = todayLocalIso();
 
   return {
     globalId,
@@ -251,6 +252,7 @@ function taskFromParsed(task: TaskWithHierarchy, globalId: string, projectArea: 
     tags: metadata.tags?.split(',').filter(Boolean),
     created: metadata.created ?? today, // Default to today if not set
     updated: metadata.updated,
+    completedAt: metadata.completedAt,
 
     // Location
     filePath: task.filePath,

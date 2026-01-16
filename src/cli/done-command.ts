@@ -1,5 +1,5 @@
 import { type Config, getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
-import { markTaskDone } from '../editor/task-editor.js';
+import { ensureTaskCompletedAt, markTaskDone } from '../editor/task-editor.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
 import type { Task, TaskIndex } from '../schema/index.js';
@@ -38,6 +38,7 @@ Mark a task as completed.
 
 Notes:
   - Cascades: all descendant subtasks are also marked done.
+  - Sets completedAt:YYYY-MM-DD when marking done (backfills if already done).
   - After editing, this command reindexes by default (writes todos.json) and
     runs a push-only sync if views are configured (use --no-reindex / --no-sync to skip).
 
@@ -112,6 +113,31 @@ function runDone(options: DoneOptions): void {
 
   // Check if already done
   if (task.completed) {
+    let completedAtUpdated = false;
+    if (!task.completedAt) {
+      const ensureResult = ensureTaskCompletedAt(task.filePath, task.lineNumber, task.text);
+      if (!ensureResult.success) {
+        throw new CliUsageError(ensureResult.error ?? 'Failed to backfill completedAt');
+      }
+      completedAtUpdated = Boolean(ensureResult.updated);
+    }
+
+    let reindexed = false;
+    if (completedAtUpdated && !noReindex) {
+      const { index: newIndex } = buildIndex(files);
+      writeIndexFile(newIndex, output);
+      reindexed = true;
+    }
+
+    const synced = completedAtUpdated
+      ? runAutoSyncIfNeeded({
+          config,
+          configPath,
+          output,
+          noSync,
+        })
+      : false;
+
     if (json) {
       console.log(
         JSON.stringify(
@@ -128,16 +154,17 @@ function runDone(options: DoneOptions): void {
               path: task.filePath,
               line: task.lineNumber,
             },
-            reindexed: false,
-            synced: false,
-            message: 'Task already done',
+            reindexed,
+            synced,
+            message: completedAtUpdated ? 'Task already done (completedAt backfilled)' : 'Task already done',
           },
           null,
           2
         )
       );
     } else {
-      console.log(`Task already done: ${globalId} (${task.text})`);
+      const suffix = completedAtUpdated ? ' (completedAt backfilled)' : '';
+      console.log(`Task already done: ${globalId} (${task.text})${suffix}`);
     }
     return;
   }

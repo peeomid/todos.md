@@ -33,6 +33,7 @@
 
 ## Changelog
 
+- 2026-01-16: TUI auto-backfills `completedAt` for completed tasks missing the field when reloading from disk.
 - 2025-12-19: Initial `tmd interactive` v1 implemented (see `local_doc/tui_implementation_details.md`).
 - 2025-12-19: Added double-`Ctrl+C` quit, header query highlight, I/O flag aliases, and "add project" flow.
 - 2025-12-19: TUI freeze hardening: `q`/double-`Ctrl+C` work even if UI is "busy", and async key errors are surfaced instead of wedging.

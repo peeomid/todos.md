@@ -183,9 +183,8 @@ Overdue: 3 tasks
 
 ## Implementation Notes
 
-- Requires `updated` field on tasks (set by `tmd enrich`)
-- Completion date inferred from `updated` when `status` changed to done
-- Consider adding `completedAt` field to index for accurate tracking
+- Uses `completedAt` when present; falls back to `updated`
+- Completion date inferred from `updated` when `completedAt` is missing
 
 ---
 

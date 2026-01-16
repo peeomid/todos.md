@@ -7,7 +7,7 @@
 
 import fs from 'node:fs';
 import { getGlobalConfigPath, loadConfig, resolveFiles, resolveOutput } from '../config/loader.js';
-import { markTaskDone } from '../editor/task-editor.js';
+import { ensureTaskCompletedAt, markTaskDone } from '../editor/task-editor.js';
 import { readIndexFile, writeIndexFile } from '../indexer/index-file.js';
 import { buildIndex } from '../indexer/indexer.js';
 import type { Task, TaskIndex } from '../schema/index.js';
@@ -43,6 +43,7 @@ interface PullResult {
     foundInView: string;
   }>;
   alreadyDone: string[];
+  completedAtBackfilled: string[];
 }
 
 interface PushResult {
@@ -129,7 +130,7 @@ function runSync(options: SyncOptions): void {
 
   const result: SyncResult = {
     success: true,
-    pull: { tasksMarkedDone: [], alreadyDone: [] },
+    pull: { tasksMarkedDone: [], alreadyDone: [], completedAtBackfilled: [] },
     push: { files: [] },
     dryRun,
   };
@@ -152,6 +153,7 @@ function runSync(options: SyncOptions): void {
       const pullResult = pullDoneFromView(viewFile, index, dryRun);
       result.pull.tasksMarkedDone.push(...pullResult.tasksMarkedDone);
       result.pull.alreadyDone.push(...pullResult.alreadyDone);
+      result.pull.completedAtBackfilled.push(...pullResult.completedAtBackfilled);
 
       if (!json) {
         console.log(`  ${viewFile}`);
@@ -163,11 +165,15 @@ function runSync(options: SyncOptions): void {
         for (const id of pullResult.alreadyDone) {
           console.log(`    · ${id} - already done in source`);
         }
+        for (const id of pullResult.completedAtBackfilled) {
+          const action = dryRun ? 'would backfill completedAt' : 'backfilled completedAt';
+          console.log(`    · ${id} - ${action}`);
+        }
       }
     }
 
     // Reindex after pull (if changes were made)
-    if (result.pull.tasksMarkedDone.length > 0 && !dryRun) {
+    if ((result.pull.tasksMarkedDone.length > 0 || result.pull.completedAtBackfilled.length > 0) && !dryRun) {
       if (!json) {
         console.log('  Reindexing...');
       }
@@ -210,6 +216,7 @@ function runSync(options: SyncOptions): void {
   } else {
     console.log('Summary:');
     console.log(`  Tasks marked done: ${result.pull.tasksMarkedDone.length}`);
+    console.log(`  completedAt backfilled: ${result.pull.completedAtBackfilled.length}`);
     console.log(`  Views updated: ${result.push.files.length}`);
     if (dryRun) {
       console.log('');
@@ -225,12 +232,17 @@ function pullDoneFromView(
   viewFile: string,
   index: TaskIndex,
   dryRun: boolean
-): { tasksMarkedDone: PullResult['tasksMarkedDone']; alreadyDone: string[] } {
+): {
+  tasksMarkedDone: PullResult['tasksMarkedDone'];
+  alreadyDone: string[];
+  completedAtBackfilled: string[];
+} {
   const content = fs.readFileSync(viewFile, 'utf-8');
   const blocks = findTmdBlocks(content);
 
   const tasksMarkedDone: PullResult['tasksMarkedDone'] = [];
   const alreadyDone: string[] = [];
+  const completedAtBackfilled: string[] = [];
 
   for (const block of blocks) {
     const blockTasks = parseTasksInBlock(block.content);
@@ -248,6 +260,12 @@ function pullDoneFromView(
 
       if (task.completed) {
         // Already done in source
+        if (!dryRun && !task.completedAt) {
+          const ensureResult = ensureTaskCompletedAt(task.filePath, task.lineNumber, task.text);
+          if (ensureResult.success && ensureResult.updated) {
+            completedAtBackfilled.push(task.globalId);
+          }
+        }
         alreadyDone.push(blockTask.globalId);
         continue;
       }
@@ -282,7 +300,7 @@ function pullDoneFromView(
     }
   }
 
-  return { tasksMarkedDone, alreadyDone };
+  return { tasksMarkedDone, alreadyDone, completedAtBackfilled };
 }
 
 /**
@@ -358,6 +376,11 @@ function cascadeMarkDoneFromView(task: Task, index: TaskIndex, dryRun: boolean):
         }
         child.completed = true;
         cascaded.push(child);
+      } else if (!dryRun && !child.completedAt) {
+        const ensureResult = ensureTaskCompletedAt(child.filePath, child.lineNumber, child.text);
+        if (ensureResult.success && ensureResult.updated) {
+          cascaded.push(child);
+        }
       }
 
       process(child);
@@ -374,6 +397,7 @@ export function printSyncHelp(): void {
 Bidirectional sync between source files and view files.
 
 Phase 1 (PULL): Read done tasks from view files → update source files
+  - Backfills completedAt:YYYY-MM-DD for done tasks missing it
 Phase 2 (PUSH): Query index → regenerate view file blocks
 
 Options:

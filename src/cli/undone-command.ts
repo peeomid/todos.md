@@ -30,6 +30,7 @@ Mark a task as incomplete.
 
 Notes:
   - No cascade: only the target task is changed.
+  - Clears completedAt when reopening a task.
   - After editing, this command reindexes by default (writes todos.json) and
     runs a push-only sync if views are configured (use --no-reindex / --no-sync to skip).
 

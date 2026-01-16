@@ -5,7 +5,7 @@ import { formatDate, parseDate, parseRelativeDate } from '../cli/date-utils.js';
 import type { Config } from '../config/loader.js';
 import { generateNextId, getExistingIdsForProject } from '../editor/id-generator.js';
 import { deleteTaskSubtree } from '../editor/task-deleter.js';
-import { markTaskDone, markTaskUndone } from '../editor/task-editor.js';
+import { ensureTaskCompletedAt, markTaskDone, markTaskUndone } from '../editor/task-editor.js';
 import {
   insertTask,
   insertTaskAfterTaskSameLevel,
@@ -15,6 +15,7 @@ import {
 import { enrichFiles } from '../enricher/index.js';
 import { buildIndex } from '../indexer/index.js';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
+import { todayLocalIso } from '../utils/date.js';
 import {
   buildFilterGroups,
   composeFilterGroups,
@@ -127,7 +128,7 @@ type RenderRow =
   | { kind: 'task'; task: Task; indent: number; sectionId: string | null };
 
 function todayIso(): string {
-  return new Date().toISOString().split('T')[0]!;
+  return todayLocalIso();
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -1620,6 +1621,26 @@ export async function runInteractiveTui(options: TuiOptions): Promise<TaskIndex>
 
   function refreshFromDisk(): void {
     refreshIndex(state, options.files);
+    if (backfillCompletedAt(state)) {
+      refreshIndex(state, options.files);
+    }
+  }
+
+  function backfillCompletedAt(state: State): boolean {
+    const completedWithoutDate = Object.values(state.index.tasks).filter(
+      (task) => task.completed && !task.completedAt
+    );
+    if (completedWithoutDate.length === 0) return false;
+
+    let updated = false;
+    for (const task of completedWithoutDate) {
+      const result = ensureTaskCompletedAt(task.filePath, task.lineNumber, task.text);
+      if (result.success && result.updated) {
+        updated = true;
+      }
+    }
+
+    return updated;
   }
 
   function fileHasTaskWithoutId(filePath: string): boolean {

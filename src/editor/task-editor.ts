@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
+import { todayLocalIso } from '../utils/date.js';
 
 export type TaskStatus = 'open' | 'done';
 
@@ -9,6 +10,12 @@ export interface EditResult {
   previousStatus?: TaskStatus;
   newStatus?: TaskStatus;
   alreadyInState?: boolean;
+}
+
+export interface EnsureCompletedAtResult {
+  success: boolean;
+  error?: string;
+  updated?: boolean;
 }
 
 /**
@@ -81,8 +88,12 @@ export function setTaskStatus(
   }
 
   const { metadata, textWithoutMetadata } = parseMetadataBlock(taskContent);
-  const today = new Date().toISOString().split('T')[0]!;
-  metadata.updated = today;
+  metadata.updated = todayLocalIso();
+  if (newStatus === 'done') {
+    metadata.completedAt = todayLocalIso();
+  } else {
+    delete metadata.completedAt;
+  }
 
   const metadataStr = serializeMetadata(orderMetadata(metadata));
   const rebuiltContent = metadataStr ? `${textWithoutMetadata} ${metadataStr}` : textWithoutMetadata;
@@ -114,6 +125,58 @@ export function markTaskDone(filePath: string, lineNumber: number, expectedText:
  */
 export function markTaskUndone(filePath: string, lineNumber: number, expectedText: string): EditResult {
   return setTaskStatus(filePath, lineNumber, expectedText, 'open');
+}
+
+/**
+ * Ensure a completed task has completedAt set.
+ */
+export function ensureTaskCompletedAt(
+  filePath: string,
+  lineNumber: number,
+  expectedText: string
+): EnsureCompletedAtResult {
+  if (!fs.existsSync(filePath)) {
+    return { success: false, error: `File not found: ${filePath}` };
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+  const lineIndex = lineNumber - 1;
+  if (lineIndex < 0 || lineIndex >= lines.length) {
+    return { success: false, error: `Line ${lineNumber} out of range (file has ${lines.length} lines)` };
+  }
+
+  const line = lines[lineIndex]!;
+  const doneMatch = line.match(/^(\s*)- \[x\] (.+)$/);
+  if (!doneMatch) {
+    return { success: false, error: `Line ${lineNumber} is not a completed task: "${line}"` };
+  }
+
+  const indent = doneMatch[1]!;
+  const taskContent = doneMatch[2]!;
+  const textWithoutMeta = extractTextWithoutMetadata(taskContent);
+  const expectedTextWithoutMeta = extractTextWithoutMetadata(expectedText);
+  if (!textsMatch(textWithoutMeta, expectedTextWithoutMeta)) {
+    return {
+      success: false,
+      error: `Task text mismatch at line ${lineNumber}. Expected "${expectedTextWithoutMeta}", found "${textWithoutMeta}". Re-run \`tmd index\`.`,
+    };
+  }
+
+  const { metadata, textWithoutMetadata } = parseMetadataBlock(taskContent);
+  if (metadata.completedAt) {
+    return { success: true, updated: false };
+  }
+
+  const today = todayLocalIso();
+  metadata.completedAt = today;
+  metadata.updated = today;
+  const metadataStr = serializeMetadata(orderMetadata(metadata));
+  const rebuiltContent = metadataStr ? `${textWithoutMetadata} ${metadataStr}` : textWithoutMetadata;
+  lines[lineIndex] = `${indent}- [x] ${rebuiltContent}`;
+  fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+
+  return { success: true, updated: true };
 }
 
 /**

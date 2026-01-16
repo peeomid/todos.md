@@ -174,20 +174,24 @@ function calculateStats(tasks: Task[], _index: TaskIndex, period: Period): Stats
   }
 
   // Completed tasks over time
-  const completedToday = tasks.filter((t) => t.completed && t.updated === todayStr).length;
+  const completedToday = tasks.filter((t) => t.completed && getCompletionDate(t) === todayStr).length;
 
   // Calculate date ranges
   const last7Days = getLastNDays(7);
   const last30Days = getLastNDays(30);
 
-  const completedLast7d = tasks.filter((t) => t.completed && t.updated && last7Days.includes(t.updated)).length;
+  const completedLast7d = tasks.filter(
+    (t) => t.completed && getCompletionDate(t) && last7Days.includes(getCompletionDate(t)!)
+  ).length;
 
-  const completedLast30d = tasks.filter((t) => t.completed && t.updated && last30Days.includes(t.updated)).length;
+  const completedLast30d = tasks.filter(
+    (t) => t.completed && getCompletionDate(t) && last30Days.includes(getCompletionDate(t)!)
+  ).length;
 
   // By day (last 7 days)
   const byDay: Record<string, number> = {};
   for (const day of last7Days) {
-    byDay[day] = tasks.filter((t) => t.completed && t.updated === day).length;
+    byDay[day] = tasks.filter((t) => t.completed && getCompletionDate(t) === day).length;
   }
 
   // Top projects (by open count)
@@ -256,6 +260,10 @@ function calculateStats(tasks: Task[], _index: TaskIndex, period: Period): Stats
       byProject: overdueByProject,
     },
   };
+}
+
+function getCompletionDate(task: Task): string | undefined {
+  return task.completedAt ?? task.updated;
 }
 
 function getLastNDays(n: number): string[] {

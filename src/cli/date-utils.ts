@@ -2,6 +2,8 @@
  * Date utilities for parsing date filter values like "today", "tomorrow", "this-week"
  */
 
+import { formatLocalDate } from '../utils/date.js';
+
 export interface DateRange {
   start: Date;
   end: Date;
@@ -67,10 +69,7 @@ export function parseDate(dateStr: string): Date | null {
  * Format a Date to YYYY-MM-DD string
  */
 export function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatLocalDate(date);
 }
 
 /**
@@ -109,9 +108,12 @@ export function parseRelativeDate(spec: string): string {
  * Parse a date spec into a DateRange
  * Supported formats:
  * - "today" - current day
+ * - "yesterday" - previous day
  * - "tomorrow" - next day
  * - "this-week" - Monday to Sunday of current week
  * - "next-week" - Monday to Sunday of next week
+ * - "last-7d" - last 7 days (including today)
+ * - "last-30d" - last 30 days (including today)
  * - "YYYY-MM-DD" - exact date
  * - "YYYY-MM-DD:YYYY-MM-DD" - date range
  */
@@ -122,6 +124,12 @@ export function parseDateSpec(spec: string): DateRange | null {
   switch (spec.toLowerCase()) {
     case 'today': {
       return { start: today, end: endOfDay(today) };
+    }
+
+    case 'yesterday': {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return { start: yesterday, end: endOfDay(yesterday) };
     }
 
     case 'tomorrow': {
@@ -140,6 +148,18 @@ export function parseDateSpec(spec: string): DateRange | null {
       const nextWeekEnd = new Date(nextWeekStart);
       nextWeekEnd.setDate(nextWeekEnd.getDate() + 6);
       return { start: nextWeekStart, end: endOfDay(nextWeekEnd) };
+    }
+
+    case 'last-7d': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 6);
+      return { start, end: endOfDay(today) };
+    }
+
+    case 'last-30d': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 29);
+      return { start, end: endOfDay(today) };
     }
 
     default: {

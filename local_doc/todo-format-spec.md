@@ -270,7 +270,7 @@ Inside `[...]` everything is `key:value` separated by spaces.
 
 ### Date-related keys
 
-All dates use `YYYY-MM-DD`.
+All dates use `YYYY-MM-DD` and represent the local calendar date (not UTC).
 
 * `plan` – **planned work date** (when I intend to do this).
 
@@ -285,6 +285,9 @@ All dates use `YYYY-MM-DD`.
 * `updated` – last time this task was updated.
 
   * Example: `updated:2025-12-09`
+* `completedAt` – when this task was completed.
+
+  * Example: `completedAt:2025-12-10`
 
 ### Planning bucket key
 

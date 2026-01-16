@@ -72,6 +72,7 @@ Query and display tasks with various filters. Primary way to interact with tasks
 
 ```bash
 tmd list
+tmd list today
 tmd list --project as-onb
 tmd list --energy low
 tmd list --due today

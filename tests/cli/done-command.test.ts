@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { handleDoneCommand } from '../../src/cli/done-command.js';
 import { writeIndexFile } from '../../src/indexer/index-file.js';
 import { buildIndex } from '../../src/indexer/indexer.js';
+import { todayLocalIso } from '../../src/utils/date.js';
 
 let originalCwd: string;
 let tempDir: string;
@@ -37,7 +38,8 @@ describe('tmd done command', () => {
     expect(() => handleDoneCommand(['--file', markdownPath, 'proj:1'])).not.toThrow();
 
     const updatedContent = fs.readFileSync(markdownPath, 'utf-8');
-    expect(updatedContent).toContain('- [x] Task [id:1]');
+    expect(updatedContent).toContain('- [x] Task [id:1');
+    expect(updatedContent).toContain(`completedAt:${todayLocalIso()}`);
   });
 
   it('auto-syncs configured view files after marking done', () => {

@@ -13,6 +13,7 @@ import {
   applyDefaultStatusToGroups,
   buildFilterGroups,
   composeFilterGroups,
+  parseFilterArg,
   type FilterOptions,
   type GroupField,
   groupTasks,
@@ -21,6 +22,7 @@ import {
   type SortField,
   sortTasks,
 } from './list-filters.js';
+import { parseDateSpec } from './date-utils.js';
 import {
   type FormatStyle,
   formatCompactFlat,
@@ -28,6 +30,15 @@ import {
   formatFull,
   formatJson,
 } from './list-formatters.js';
+
+const TODAY_SHORTCUT = 'today';
+const TODAY_QUERY = '(bucket:today | plan:today | due:today)';
+const DATE_RANGE_REGEX = /^\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2}$/;
+const STATUS_SHORTHANDS: Record<string, string> = {
+  done: 'status:done',
+  open: 'status:open',
+  all: 'status:all',
+};
 
 interface ListOptions {
   // Filters (from key:value syntax or legacy flags)
@@ -49,6 +60,27 @@ interface ListOptions {
 export function handleListCommand(args: string[]): void {
   const options = parseListFlags(args);
   runList(options);
+}
+
+export function normalizeListQueryArgs(args: string[]): string[] {
+  const hasDone = args.some((arg) => arg === 'done' || arg === 'status:done');
+
+  return args.map((arg) => {
+    if (STATUS_SHORTHANDS[arg]) return STATUS_SHORTHANDS[arg];
+    if (arg === TODAY_SHORTCUT) {
+      return hasDone ? 'updated:today' : TODAY_QUERY;
+    }
+    if (hasDone && isBareDateSpec(arg)) {
+      return `updated:${arg}`;
+    }
+    return arg;
+  });
+}
+
+function isBareDateSpec(arg: string): boolean {
+  if (DATE_RANGE_REGEX.test(arg)) return true;
+  if (parseFilterArg(arg)) return false;
+  return parseDateSpec(arg) !== null;
 }
 
 function parseListFlags(args: string[]): ListOptions {
@@ -74,11 +106,12 @@ function parseListFlags(args: string[]): ListOptions {
   const config = loadConfig(configPath);
   const output = resolveOutput(config, valueFlags['--output'] ?? valueFlags['-o']);
 
-  // Parse key:value filters from remaining args
-  const query = args.join(' ');
+  // Parse key:value filters from remaining args (plus shorthand expansions)
+  const expandedArgs = normalizeListQueryArgs(args);
+  const query = expandedArgs.join(' ');
   let filterGroups: string[][];
   try {
-    filterGroups = parseQueryToFilterGroups(args);
+    filterGroups = parseQueryToFilterGroups(query);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid query syntax.';
     throw new CliUsageError(message);
@@ -223,8 +256,9 @@ export function printListHelp(): void {
     '  energy:<level>        Filter by energy (low, normal, high)',
     '  priority:<level>      Filter by priority (high, normal, low)',
     '  due:<date>            Filter by due date spec:',
-    '                        today | tomorrow | this-week | next-week | YYYY-MM-DD | YYYY-MM-DD:YYYY-MM-DD',
+    '                        today | yesterday | tomorrow | this-week | next-week | last-7d | last-30d | YYYY-MM-DD | YYYY-MM-DD:YYYY-MM-DD',
     '  plan:<date>           Filter by plan date spec (same formats as due:)',
+    '  updated:<date>        Filter by updated date spec (same formats as due:)',
     '  bucket:<name>         Filter by bucket (today, upcoming, anytime, someday, now, or custom)',
     '  overdue:true          Show only overdue tasks',
     '  status:<status>       Filter by status (open, done, all) [default: open]',
@@ -232,6 +266,7 @@ export function printListHelp(): void {
     '  parent:<id>           Show children of a task',
     '  top-level:true        Show only top-level tasks',
     '  text:<query>          Full-text search in task text',
+    '  today                Shortcut for (bucket:today | plan:today | due:today)',
     '  Use "|" or "OR" for OR (group with parentheses):',
     '    (bucket:today | plan:today) priority:high',
     '',
@@ -244,6 +279,7 @@ export function printListHelp(): void {
     '',
     'Examples:',
     '  tmd list                          # List all open tasks',
+    '  tmd list today                    # Today (bucket/plan/due)',
     '  tmd list project:inbox            # Filter by project',
     '  tmd list energy:low               # Light tasks only',
     "  tmd list bucket:today             # Today's tasks",

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { parseMetadataBlock, serializeMetadata } from '../parser/metadata-parser.js';
+import { todayLocalIso } from '../utils/date.js';
 import { generateNextId } from './id-generator.js';
 import { parseShorthands } from './shorthand-parser.js';
 import type { EnrichChange, EnrichFileResult, EnrichOptions, EnrichResult } from './types.js';
@@ -27,7 +28,7 @@ export function enrichFile(filePath: string, options: EnrichOptions): EnrichFile
 export function enrichContent(content: string, filePath: string, options: EnrichOptions): EnrichFileResult {
   const lines = content.split('\n');
   const changes: EnrichChange[] = [];
-  const today = new Date().toISOString().split('T')[0]!; // YYYY-MM-DD
+  const today = todayLocalIso();
 
   // First pass: collect existing IDs per project
   const projectsById = new Map<string, ProjectContext>();
